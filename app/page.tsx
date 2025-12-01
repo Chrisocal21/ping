@@ -1,87 +1,73 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
+import { getCurrentUser, logout, type User } from '@/lib/auth'
+import { useRouter } from 'next/navigation'
 
 export default function LandingPage() {
+  const router = useRouter()
+  const [user, setUser] = useState<User | null>(null)
+
+  useEffect(() => {
+    setUser(getCurrentUser())
+  }, [])
+
+  const handleLogout = () => {
+    logout()
+    setUser(null)
+  }
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
-      <div className="max-w-2xl w-full text-center space-y-8">
+      <div className="max-w-md w-full text-center space-y-12">
+        {/* User Info / Logout */}
+        {user && (
+          <div className="absolute top-4 right-4">
+            <div className="flex items-center gap-3 bg-ai-bubble rounded-full px-4 py-2">
+              <span className="text-sm text-gray-400">Hi, {user.username}</span>
+              <button
+                onClick={handleLogout}
+                className="text-sm text-gray-400 hover:text-white transition-colors"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Logo / Name */}
-        <div className="space-y-3">
-          <h1 className="text-6xl font-bold tracking-tight">Ping</h1>
-          <p className="text-xl text-gray-400">
-            A quick signal when you need one.
+        <div className="space-y-2">
+          <h1 className="text-7xl font-bold tracking-tight">Ping</h1>
+          <p className="text-lg text-gray-400">
+            Your AI companion
           </p>
-        </div>
-
-        {/* Main Description */}
-        <div className="space-y-4 py-8">
-          <p className="text-2xl font-medium text-white">
-            Your smart-mouthed AI companion for conversations, emotions, and life.
-          </p>
-          <p className="text-lg text-gray-300">
-            Without the therapy vibes.
-          </p>
-        </div>
-
-        {/* Features Grid */}
-        <div className="grid md:grid-cols-3 gap-6 py-8">
-          <div className="bg-ai-bubble rounded-2xl p-6 space-y-3">
-            <h3 className="text-lg font-semibold">Practice Conversations</h3>
-            <p className="text-sm text-gray-400">
-              Get better at talking to people through low-pressure practice.
-            </p>
-          </div>
-          <div className="bg-ai-bubble rounded-2xl p-6 space-y-3">
-            <h3 className="text-lg font-semibold">Process Emotions</h3>
-            <p className="text-sm text-gray-400">
-              A safe space to vent and untangle feelings without judgment.
-            </p>
-          </div>
-          <div className="bg-ai-bubble rounded-2xl p-6 space-y-3">
-            <h3 className="text-lg font-semibold">Get Unstuck</h3>
-            <p className="text-sm text-gray-400">
-              Make decisions, find motivation, and break through stuck points.
-            </p>
-          </div>
         </div>
 
         {/* CTA */}
-        <div className="space-y-4 pt-8">
+        <div className="space-y-4">
+          {user ? (
+            <Link
+              href="/chat"
+              className="block bg-user-bubble hover:bg-blue-600 transition-colors px-8 py-5 rounded-full text-xl font-semibold"
+            >
+              Continue
+            </Link>
+          ) : (
+            <Link
+              href="/login"
+              className="block bg-user-bubble hover:bg-blue-600 transition-colors px-8 py-5 rounded-full text-xl font-semibold"
+            >
+              Sign In
+            </Link>
+          )}
+          
           <Link
-            href="/chat"
-            className="inline-block bg-user-bubble hover:bg-blue-600 transition-colors px-8 py-4 rounded-full text-lg font-semibold"
+            href="/about"
+            className="block bg-gray-800 hover:bg-gray-700 transition-colors px-8 py-4 rounded-full text-lg font-medium border border-gray-700"
           >
-            Start Talking
+            How It Works
           </Link>
-          <p className="text-sm text-gray-500">
-            No account required. Just chat.
-          </p>
-        </div>
-
-        {/* Personalities Preview */}
-        <div className="pt-12 space-y-4">
-          <p className="text-sm text-gray-500 uppercase tracking-wide">
-            Choose your companion
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="bg-ai-bubble rounded-xl p-4 space-y-1">
-              <p className="font-semibold">Max</p>
-              <p className="text-xs text-gray-400">Witty Realist</p>
-            </div>
-            <div className="bg-ai-bubble rounded-xl p-4 space-y-1">
-              <p className="font-semibold">Jamie</p>
-              <p className="text-xs text-gray-400">Warm Encourager</p>
-            </div>
-            <div className="bg-ai-bubble rounded-xl p-4 space-y-1">
-              <p className="font-semibold">Sage</p>
-              <p className="text-xs text-gray-400">Calm Guide</p>
-            </div>
-            <div className="bg-ai-bubble rounded-xl p-4 space-y-1">
-              <p className="font-semibold">Riley</p>
-              <p className="text-xs text-gray-400">Energetic Ally</p>
-            </div>
-          </div>
         </div>
       </div>
     </div>
