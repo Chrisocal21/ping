@@ -9,6 +9,7 @@ import {
   savePersonalityPreference, 
   getPersonalityPreference 
 } from '@/lib/personalities'
+import { PersonalityAvatar } from '@/components/PersonalityAvatar'
 import { 
   getUserMemory, 
   exportUserData, 
@@ -147,7 +148,7 @@ export default function SettingsPage() {
           <div className="flex items-center space-x-4">
             <button
               onClick={() => router.push('/chat')}
-              className="text-gray-400 hover:text-white transition-colors"
+              className="text-gray-400 hover:bg-gradient-to-r hover:from-[#14F195] hover:to-[#0EA5E9] hover:bg-clip-text hover:text-transparent transition-all"
             >
               ← Back
             </button>
@@ -155,7 +156,7 @@ export default function SettingsPage() {
           </div>
           <button
             onClick={handleExportData}
-            className="text-sm px-4 py-2 bg-user-bubble hover:bg-user-bubble/80 rounded-lg transition-colors"
+            className="text-sm px-4 py-2 bg-gradient-to-r from-[#14F195] to-[#0EA5E9] hover:from-[#0EA5E9] hover:to-[#14F195] rounded-lg transition-all text-gray-900"
           >
             Export Data
           </button>
@@ -183,16 +184,16 @@ export default function SettingsPage() {
                   onClick={() => handlePersonalityChange(personality.id)}
                   className={`w-full flex items-start space-x-4 p-4 rounded-lg border-2 transition-all ${
                     selectedPersonality === personality.id
-                      ? 'border-user-bubble bg-user-bubble/10'
+                      ? 'border-[#14F195] bg-gradient-to-r from-[#14F195]/10 to-[#0EA5E9]/10'
                       : 'border-gray-700 hover:border-gray-600'
                   }`}
                 >
-                  <div className="text-3xl flex-shrink-0">{personality.emoji}</div>
+                  <PersonalityAvatar personalityId={personality.id} size="lg" />
                   <div className="flex-1 text-left">
                     <div className="flex items-center justify-between mb-1">
                       <p className="font-semibold">{personality.name}</p>
                       {selectedPersonality === personality.id && (
-                        <span className="text-xs px-2 py-1 bg-user-bubble rounded-full">Active</span>
+                        <span className="text-xs px-2 py-1 bg-gradient-to-r from-[#14F195] to-[#0EA5E9] rounded-full text-gray-900">Active</span>
                       )}
                     </div>
                     <p className="text-sm text-gray-400 mb-2">{personality.tagline}</p>
@@ -221,15 +222,15 @@ export default function SettingsPage() {
             <div className="grid grid-cols-3 gap-3">
               {[
                 { value: 'brief', label: 'Brief', desc: '1-2 sentences' },
-                { value: 'normal', label: 'Normal', desc: '2-4 sentences' },
-                { value: 'detailed', label: 'Detailed', desc: '4-6 sentences' }
+                { value: 'normal', label: 'Normal', desc: '1-3 sentences' },
+                { value: 'detailed', label: 'Detailed', desc: '3-5 sentences' }
               ].map((option) => (
                 <button
                   key={option.value}
                   onClick={() => handleResponseLengthChange(option.value as any)}
                   className={`p-4 rounded-lg border-2 transition-all ${
                     responseLength === option.value
-                      ? 'border-user-bubble bg-user-bubble/10'
+                      ? 'border-[#14F195] bg-gradient-to-r from-[#14F195]/10 to-[#0EA5E9]/10'
                       : 'border-gray-700 hover:border-gray-600'
                   }`}
                 >
@@ -252,27 +253,27 @@ export default function SettingsPage() {
               
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="text-center p-3 bg-gray-800/50 rounded-lg">
-                  <p className="text-2xl font-bold text-user-bubble">{dataStats.factsCount}</p>
+                  <p className="text-2xl font-bold bg-gradient-to-r from-[#14F195] to-[#0EA5E9] bg-clip-text text-transparent">{dataStats.factsCount}</p>
                   <p className="text-xs text-gray-400 mt-1">Facts Learned</p>
                 </div>
                 <div className="text-center p-3 bg-gray-800/50 rounded-lg">
-                  <p className="text-2xl font-bold text-user-bubble">{dataStats.conversationsCount}</p>
+                  <p className="text-2xl font-bold bg-gradient-to-r from-[#14F195] to-[#0EA5E9] bg-clip-text text-transparent">{dataStats.conversationsCount}</p>
                   <p className="text-xs text-gray-400 mt-1">Conversations</p>
                 </div>
                 <div className="text-center p-3 bg-gray-800/50 rounded-lg">
-                  <p className="text-2xl font-bold text-user-bubble">{dataStats.scenariosCompleted}</p>
+                  <p className="text-2xl font-bold bg-gradient-to-r from-[#14F195] to-[#0EA5E9] bg-clip-text text-transparent">{dataStats.scenariosCompleted}</p>
                   <p className="text-xs text-gray-400 mt-1">Scenarios</p>
                 </div>
                 <div className="text-center p-3 bg-gray-800/50 rounded-lg">
-                  <p className="text-2xl font-bold text-user-bubble">{dataStats.currentStreak}</p>
+                  <p className="text-2xl font-bold bg-gradient-to-r from-[#14F195] to-[#0EA5E9] bg-clip-text text-transparent">{dataStats.currentStreak}</p>
                   <p className="text-xs text-gray-400 mt-1">Current Streak</p>
                 </div>
                 <div className="text-center p-3 bg-gray-800/50 rounded-lg">
-                  <p className="text-2xl font-bold text-user-bubble">{dataStats.longestStreak}</p>
+                  <p className="text-2xl font-bold bg-gradient-to-r from-[#14F195] to-[#0EA5E9] bg-clip-text text-transparent">{dataStats.longestStreak}</p>
                   <p className="text-xs text-gray-400 mt-1">Longest Streak</p>
                 </div>
                 <div className="text-center p-3 bg-gray-800/50 rounded-lg">
-                  <p className="text-2xl font-bold text-user-bubble">{dataStats.totalDays}</p>
+                  <p className="text-2xl font-bold bg-gradient-to-r from-[#14F195] to-[#0EA5E9] bg-clip-text text-transparent">{dataStats.totalDays}</p>
                   <p className="text-xs text-gray-400 mt-1">Total Days</p>
                 </div>
               </div>
@@ -385,7 +386,7 @@ export default function SettingsPage() {
             
             <button
               onClick={() => router.push('/about')}
-              className="w-full px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium transition-colors flex items-center justify-between"
+              className="w-full px-4 py-3 bg-gradient-to-r from-[#14F195] to-[#0EA5E9] hover:from-[#0EA5E9] hover:to-[#14F195] rounded-lg text-sm font-medium transition-all flex items-center justify-between text-gray-900"
             >
               <span>How It Works</span>
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

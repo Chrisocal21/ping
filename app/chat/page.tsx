@@ -1,7 +1,9 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useRef, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import dynamic from 'next/dynamic'
+import { handleAPIError, retryWithBackoff, fetchWithTimeout, logError } from '@/lib/error-handling'
 import { 
   createSession, 
   getLastVisit, 
@@ -28,7 +30,25 @@ import {
   adaptScenarioDifficulty,
   getScenarioIntelligenceSummary
 } from '@/lib/scenario-intelligence'
+import {
+  createConversation,
+  getConversation,
+  addMessagesToConversation,
+  getActiveConversation,
+  setActiveConversation,
+  clearActiveConversation,
+  getAllConversations,
+  type SavedMessage,
+  type SavedConversation
+} from '@/lib/conversation-history'
 import ScenarioCard from '@/components/ScenarioCard'
+import { PersonalityAvatar } from '@/components/PersonalityAvatar'
+
+// Lazy load heavy components for better performance
+const OnboardingModal = dynamic(() => import('@/components/OnboardingModal').then(mod => ({ default: mod.OnboardingModal })), {
+  ssr: false,
+  loading: () => <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#14F195]"></div></div>
+})
 
 interface Message {
   id: string
@@ -43,6 +63,7 @@ interface Message {
 
 export default function ChatPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [currentSession, setCurrentSession] = useState<Session | null>(null)
   const [conversationMode, setConversationMode] = useState<ConversationMode>('chat')
@@ -52,9 +73,17 @@ export default function ChatPage() {
   const [activeScenario, setActiveScenario] = useState<Scenario | null>(null)
   const [selectedPersonality, setSelectedPersonality] = useState<string>('max')
   const [showPersonalityDropdown, setShowPersonalityDropdown] = useState(false)
+  const [pendingMessages, setPendingMessages] = useState<string[]>([])
+  const [lastSendTime, setLastSendTime] = useState<number>(0)
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
+  const [showConversationsSidebar, setShowConversationsSidebar] = useState(false)
+  const [responseLength, setResponseLength] = useState<'brief' | 'normal' | 'detailed'>('normal')
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [followUpQuestions, setFollowUpQuestions] = useState<Array<{text: string, category: string}> | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const sendTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Check authentication on mount
+  // Check authentication on mount and load/create conversation
   useEffect(() => {
     const user = getCurrentUser()
     if (!user) {
@@ -64,12 +93,120 @@ export default function ChatPage() {
     
     setCurrentUser(user)
 
+    // Check if first-time user
+    const hasSeenOnboarding = localStorage.getItem(`ping_onboarding_${user.username}`)
+    if (!hasSeenOnboarding) {
+      setShowOnboarding(true)
+      return // Don't load conversation yet
+    }
+
     // Load personality preference
     const preferredPersonality = getPersonalityPreference(user.username)
     setSelectedPersonality(preferredPersonality)
 
+    // Load response length preference
+    const storedLength = localStorage.getItem(`ping_responseLength_${user.username}`)
+    if (storedLength) {
+      setResponseLength(storedLength as 'brief' | 'normal' | 'detailed')
+    }
+
+    // Check if loading existing conversation from URL
+    const conversationIdParam = searchParams?.get('conversation')
+    
+    if (conversationIdParam) {
+      // Load existing conversation
+      const savedConvo = getConversation(conversationIdParam)
+      if (savedConvo) {
+        setCurrentConversationId(savedConvo.metadata.id)
+        setSelectedPersonality(savedConvo.metadata.personality)
+        
+        // Convert saved messages to Message format
+        const loadedMessages: Message[] = savedConvo.messages.map(msg => ({
+          id: msg.id,
+          sender: msg.sender,
+          content: msg.content,
+          timestamp: new Date(msg.timestamp)
+        }))
+        
+        setMessages(loadedMessages)
+        setActiveConversation(user.username, savedConvo.metadata.personality, savedConvo.metadata.id)
+      }
+    } else {
+      // Check for active conversation for this personality
+      const activeConvId = getActiveConversation(user.username, preferredPersonality)
+      
+      if (activeConvId) {
+        const savedConvo = getConversation(activeConvId)
+        if (savedConvo) {
+          // Continue existing conversation
+          setCurrentConversationId(savedConvo.metadata.id)
+          
+          const loadedMessages: Message[] = savedConvo.messages.map(msg => ({
+            id: msg.id,
+            sender: msg.sender,
+            content: msg.content,
+            timestamp: new Date(msg.timestamp)
+          }))
+          
+          setMessages(loadedMessages)
+        }
+      } else {
+        // Start new conversation
+        const lastVisit = getLastVisit()
+        const welcomeMsg = getWelcomeMessage(lastVisit, preferredPersonality)
+        
+        const initialMessage: SavedMessage = {
+          id: '1',
+          sender: 'ai',
+          content: welcomeMsg,
+          timestamp: new Date().toISOString()
+        }
+        
+        const newConvo = createConversation(user.username, preferredPersonality, initialMessage)
+        setCurrentConversationId(newConvo.metadata.id)
+        setActiveConversation(user.username, preferredPersonality, newConvo.metadata.id)
+        
+        setMessages([{
+          id: '1',
+          sender: 'ai',
+          content: welcomeMsg,
+          timestamp: new Date(),
+        }])
+      }
+    }
+
+    const session = createSession('chat')
+    setCurrentSession(session)
+    updateLastVisit()
+  }, [router, searchParams])
+
+  const handleOnboardingComplete = (personalityId: string) => {
+    if (!currentUser) return
+
+    // Save onboarding completion flag
+    localStorage.setItem(`ping_onboarding_${currentUser.username}`, 'true')
+    
+    // Save personality preference
+    savePersonalityPreference(currentUser.username, personalityId)
+    setSelectedPersonality(personalityId)
+    
+    // Hide onboarding
+    setShowOnboarding(false)
+
+    // Start new conversation
     const lastVisit = getLastVisit()
-    const welcomeMsg = getWelcomeMessage(lastVisit)
+    const welcomeMsg = getWelcomeMessage(lastVisit, personalityId)
+    
+    const initialMessage: SavedMessage = {
+      id: '1',
+      sender: 'ai',
+      content: welcomeMsg,
+      timestamp: new Date().toISOString()
+    }
+    
+    const newConvo = createConversation(currentUser.username, personalityId, initialMessage)
+    setCurrentConversationId(newConvo.metadata.id)
+    setActiveConversation(currentUser.username, personalityId, newConvo.metadata.id)
     
     setMessages([{
       id: '1',
@@ -81,20 +218,196 @@ export default function ChatPage() {
     const session = createSession('chat')
     setCurrentSession(session)
     updateLastVisit()
-  }, [router])
+  }
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     logout()
     router.push('/')
-  }
+  }, [router])
 
-  const scrollToBottom = () => {
+  // Memoize personality data to avoid recalculation
+  const allPersonalities = useMemo(() => getAllPersonalities(), [])
+  const currentPersonality = useMemo(() => getPersonality(selectedPersonality), [selectedPersonality])
+
+  const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }
+  }, [])
 
   useEffect(() => {
     scrollToBottom()
-  }, [messages, isTyping])
+  }, [messages, isTyping, scrollToBottom])
+
+  const processPendingMessages = useCallback(async (messagesToProcess: string[], allMessages: Message[]) => {
+    if (messagesToProcess.length === 0) return
+    
+    setIsTyping(true)
+    
+    try {
+      // Combine pending messages if there are multiple
+      const combinedInput = messagesToProcess.length > 1 
+        ? messagesToProcess.join('\n\n')
+        : messagesToProcess[0]
+      
+      // Include the combined messages in conversation history
+      const conversationHistory = [
+        ...allMessages.map((msg) => ({
+          role: msg.sender === 'user' ? 'user' : 'assistant',
+          content: msg.content,
+        })),
+        {
+          role: 'user',
+          content: combinedInput,
+        }
+      ]
+      
+      // Use retry logic with exponential backoff for resilience
+      const data = await retryWithBackoff(async () => {
+        const response = await fetchWithTimeout('/api/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messages: conversationHistory,
+            mode: conversationMode,
+            userId: currentUser?.username || 'admin',
+            personality: selectedPersonality,
+            responseLength: responseLength,
+          }),
+        }, 30000) // 30 second timeout
+
+        return await response.json()
+      }, 2) // Max 2 retries
+      
+      // Show subtle intent detection feedback
+      if (data.detectedIntent && data.intentConfidence > 0.7) {
+        const intentLabels = {
+          practice: '🎯 Practice mode',
+          vent: '💭 Listening mode',
+          coaching: '🤔 Thinking mode',
+          chat: '💬 Chat mode'
+        }
+        console.log(`Intent detected: ${intentLabels[data.detectedIntent as keyof typeof intentLabels]} (${Math.round(data.intentConfidence * 100)}% confidence)`)
+      }
+      
+      // Store follow-up questions if provided
+      if (data.followUpQuestions && data.followUpQuestions.length > 0) {
+        setFollowUpQuestions(data.followUpQuestions)
+      } else {
+        setFollowUpQuestions(null)
+      }
+      
+      // Handle multi-bubble responses for more natural conversation
+      if (data.bubbles && data.bubbles.length > 1) {
+        // Send each bubble with a delay between them
+        for (let i = 0; i < data.bubbles.length; i++) {
+          // Show typing for each bubble
+          if (i > 0) {
+            setIsTyping(true)
+            await new Promise(resolve => setTimeout(resolve, 400 + Math.random() * 400))
+          }
+          
+          setIsTyping(false)
+          const aiMessage: Message = {
+            id: `${Date.now()}_${i}`,
+            sender: 'ai',
+            content: data.bubbles[i],
+            timestamp: new Date(),
+            isCrisis: data.isCrisis && i === 0,
+            triggerType: data.triggerType,
+          }
+          
+          setMessages((prev) => [...prev, aiMessage])
+          
+          // Small delay before next bubble
+          if (i < data.bubbles.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 300))
+          }
+        }
+      } else {
+        // Single bubble response
+        await new Promise(resolve => setTimeout(resolve, 400 + Math.random() * 400))
+        
+        const aiMessage: Message = {
+          id: Date.now().toString(),
+          sender: 'ai',
+          content: data.reply,
+          timestamp: new Date(),
+          isCrisis: data.isCrisis,
+          triggerType: data.triggerType,
+        }
+        
+        setMessages((prev) => {
+          const updated = [...prev, aiMessage]
+          // Save to conversation history
+          if (currentConversationId && currentUser) {
+            const savedMsg: SavedMessage = {
+              id: aiMessage.id,
+              sender: aiMessage.sender,
+              content: aiMessage.content,
+              timestamp: aiMessage.timestamp.toISOString()
+            }
+            addMessagesToConversation(currentConversationId, [savedMsg])
+          }
+          return updated
+        })
+      }
+      
+      // Clear pending messages
+      setPendingMessages([])
+      
+    } catch (error) {
+      // Get user-friendly error message
+      const apiError = handleAPIError(error)
+      
+      // Log error with context for debugging
+      logError('processPendingMessages', error, {
+        userId: currentUser?.username,
+        personality: selectedPersonality,
+        mode: conversationMode,
+        messageCount: messagesToProcess.length
+      })
+      
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        sender: 'ai',
+        content: apiError.message,
+        timestamp: new Date(),
+      }
+      
+      setMessages((prev) => {
+        const updated = [...prev, errorMessage]
+        // Save error message too
+        if (currentConversationId && currentUser) {
+          const savedMsg: SavedMessage = {
+            id: errorMessage.id,
+            sender: errorMessage.sender,
+            content: errorMessage.content,
+            timestamp: errorMessage.timestamp.toISOString()
+          }
+          addMessagesToConversation(currentConversationId, [savedMsg])
+        }
+        return updated
+      })
+      setPendingMessages([])
+    } finally {
+      setIsTyping(false)
+    }
+  }, [conversationMode, currentUser, selectedPersonality, currentConversationId])
+
+  // Helper to save messages to conversation history
+  const saveMessagesToHistory = useCallback((newMessages: Message[]) => {
+    if (!currentConversationId || !currentUser) return
+    
+    const savedMessages: SavedMessage[] = newMessages.map(msg => ({
+      id: msg.id,
+      sender: msg.sender,
+      content: msg.content,
+      timestamp: msg.timestamp.toISOString()
+    }))
+    
+    addMessagesToConversation(currentConversationId, savedMessages)
+  }, [currentConversationId, currentUser])
 
   const handleModeChange = (mode: ConversationMode) => {
     setConversationMode(mode)
@@ -292,65 +605,60 @@ export default function ChatPage() {
       return
     }
     
-    // Normal message handling
+    // Handle rapid/double messaging - group messages sent within 3 seconds
+    const now = Date.now()
+    const timeSinceLastSend = now - lastSendTime
+    
+    // Add current message to user's messages
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: now.toString(),
       sender: 'user',
       content: inputValue,
       timestamp: new Date(),
     }
-    setMessages((prev) => [...prev, userMessage])
+    const currentInput = inputValue
     setInputValue('')
-    setIsTyping(true)
-
-    // Call API for response
-    try {
-      const currentInput = inputValue
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: messages.map((msg) => ({
-            role: msg.sender === 'user' ? 'user' : 'assistant',
-            content: msg.content,
-          })),
-          message: currentInput,
-          mode: conversationMode,
-          userId: currentUser?.username || 'admin',
-          personality: selectedPersonality,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to get response')
-      }
-
-      const data = await response.json()
+    
+    // Update messages and capture the new state
+    setMessages((prev) => {
+      const newMessages = [...prev, userMessage]
       
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        sender: 'ai',
-        content: data.reply,
-        timestamp: new Date(),
-        isCrisis: data.isCrisis,
-        triggerType: data.triggerType,
+      // Save user message to conversation history
+      if (currentConversationId && currentUser) {
+        const savedMsg: SavedMessage = {
+          id: userMessage.id,
+          sender: userMessage.sender,
+          content: userMessage.content,
+          timestamp: userMessage.timestamp.toISOString()
+        }
+        addMessagesToConversation(currentConversationId, [savedMsg])
       }
       
-      setMessages((prev) => [...prev, aiMessage])
-    } catch (error) {
-      console.error('Error sending message:', error)
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        sender: 'ai',
-        content: "Sorry, something went wrong on my end. Try again?",
-        timestamp: new Date(),
+      // Clear any existing timeout
+      if (sendTimeoutRef.current) {
+        clearTimeout(sendTimeoutRef.current)
       }
-      setMessages((prev) => [...prev, errorMessage])
-    } finally {
-      setIsTyping(false)
-    }
+      
+      // Update pending messages
+      const newPending = [...pendingMessages, currentInput]
+      setPendingMessages(newPending)
+      setLastSendTime(now)
+      
+      // If user is rapid-firing messages (< 3 seconds apart), wait a bit longer
+      if (timeSinceLastSend < 3000 && pendingMessages.length > 0) {
+        // Wait for more messages
+        sendTimeoutRef.current = setTimeout(() => {
+          processPendingMessages(newPending, newMessages)
+        }, 2000)
+      } else {
+        // Otherwise process immediately with slight delay
+        sendTimeoutRef.current = setTimeout(() => {
+          processPendingMessages(newPending, newMessages)
+        }, 800)
+      }
+      
+      return newMessages
+    })
   }
 
   const handleScenarioOptionSelect = (option: ScenarioOption) => {
@@ -413,6 +721,11 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-screen bg-background">
+      {/* Onboarding Modal */}
+      {showOnboarding && currentUser && (
+        <OnboardingModal onComplete={handleOnboardingComplete} />
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
         <div className="relative">
@@ -420,17 +733,14 @@ export default function ChatPage() {
             onClick={() => setShowPersonalityDropdown(!showPersonalityDropdown)}
             className="flex items-center space-x-3 hover:bg-gray-800/50 rounded-lg px-2 py-1 -ml-2 transition-colors"
           >
-            <div className="w-10 h-10 rounded-full bg-ai-bubble flex items-center justify-center text-xl">
-              {getPersonality(selectedPersonality).emoji}
-            </div>
+            <PersonalityAvatar personalityId={selectedPersonality} size="md" />
             <div className="text-left">
               <div className="flex items-center space-x-1">
-                <p className="font-semibold">{getPersonality(selectedPersonality).name}</p>
+                <p className="font-semibold tracking-wide">{currentPersonality.name}</p>
                 <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </div>
-              <p className="text-xs text-gray-400">{getPersonality(selectedPersonality).tagline}</p>
             </div>
           </button>
 
@@ -438,7 +748,7 @@ export default function ChatPage() {
           {showPersonalityDropdown && (
             <div className="absolute top-full left-0 mt-2 w-80 bg-[#1a1a24] border border-gray-700 rounded-lg shadow-xl z-50">
               <div className="p-2 space-y-1">
-                {getAllPersonalities().map((personality) => (
+                {allPersonalities.map((personality) => (
                   <button
                     key={personality.id}
                     onClick={() => {
@@ -448,14 +758,38 @@ export default function ChatPage() {
                       }
                       setShowPersonalityDropdown(false)
                       
-                      // Add a message showing personality switch
+                      // Clear conversation and start fresh with new personality
+                      const greetings: Record<string, string> = {
+                        max: "Hey there. I'm here to help. What would you like to talk about?",
+                        jamie: "Hey! Ready to tackle whatever's on your mind. What's up?",
+                        sage: "Hi. I'm here to listen and help you find clarity. What's going on?",
+                        riley: "Hey. Let's figure this out together. What's the situation?"
+                      }
+                      
                       const switchMessage: Message = {
                         id: Date.now().toString(),
                         sender: 'ai',
-                        content: `Hey! I'm ${personality.name}. ${personality.tagline} What's on your mind?`,
+                        content: greetings[personality.id] || `Hey. I'm ${personality.name}. What's on your mind?`,
                         timestamp: new Date(),
                       }
-                      setMessages((prev) => [...prev, switchMessage])
+                      
+                      // Start fresh - clear previous conversation and create new one
+                      if (currentUser) {
+                        const initialSavedMessage: SavedMessage = {
+                          id: switchMessage.id,
+                          sender: switchMessage.sender,
+                          content: switchMessage.content,
+                          timestamp: switchMessage.timestamp.toISOString()
+                        }
+                        
+                        const newConvo = createConversation(currentUser.username, personality.id, initialSavedMessage)
+                        setCurrentConversationId(newConvo.metadata.id)
+                        setActiveConversation(currentUser.username, personality.id, newConvo.metadata.id)
+                      }
+                      
+                      setMessages([switchMessage])
+                      setPendingMessages([])
+                      setActiveScenario(null)
                     }}
                     className={`w-full flex items-start space-x-3 p-3 rounded-lg transition-colors ${
                       selectedPersonality === personality.id
@@ -463,7 +797,7 @@ export default function ChatPage() {
                         : 'hover:bg-gray-800/50'
                     }`}
                   >
-                    <div className="text-2xl flex-shrink-0 mt-1">{personality.emoji}</div>
+                    <PersonalityAvatar personalityId={personality.id} size="md" />
                     <div className="flex-1 text-left">
                       <div className="flex items-center justify-between">
                         <p className="font-semibold text-sm">{personality.name}</p>
@@ -487,6 +821,24 @@ export default function ChatPage() {
           )}
         </div>
         <div className="flex items-center space-x-4">
+          <button
+            onClick={() => router.push('/insights')}
+            className="text-gray-400 hover:text-white transition-colors"
+            title="Insights Dashboard"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          </button>
+          <button
+            onClick={() => setShowConversationsSidebar(true)}
+            className="text-gray-400 hover:text-white transition-colors"
+            title="Conversation History"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            </svg>
+          </button>
           <button
             onClick={() => router.push('/settings')}
             className="text-gray-400 hover:text-white transition-colors"
@@ -547,6 +899,82 @@ export default function ChatPage() {
           </div>
         ))}
 
+        {/* Follow-Up Questions */}
+        {followUpQuestions && followUpQuestions.length > 0 && !isTyping && (
+          <div className="flex justify-start animate-fade-in">
+            <div className="max-w-[75%] space-y-2">
+              <p className="text-xs text-gray-500 px-1 mb-1">Tap to continue:</p>
+              {followUpQuestions.map((question, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    setInputValue(question.text)
+                    setFollowUpQuestions(null)
+                    // Auto-send after a brief delay so user sees it populate
+                    setTimeout(() => {
+                      const trimmed = question.text.trim()
+                      if (trimmed) {
+                        const userMessage: Message = {
+                          id: Date.now().toString(),
+                          sender: 'user',
+                          content: trimmed,
+                          timestamp: new Date(),
+                        }
+                        setMessages((prev) => {
+                          const updated = [...prev, userMessage]
+                          if (currentConversationId && currentUser) {
+                            const savedMsg: SavedMessage = {
+                              id: userMessage.id,
+                              sender: userMessage.sender,
+                              content: userMessage.content,
+                              timestamp: userMessage.timestamp.toISOString()
+                            }
+                            addMessagesToConversation(currentConversationId, [savedMsg])
+                          }
+                          return updated
+                        })
+                        setInputValue('')
+                        setPendingMessages([trimmed])
+                        setLastSendTime(Date.now())
+                        
+                        // Start processing
+                        setTimeout(() => {
+                          const currentMessages = messages
+                          processPendingMessages([trimmed], [...currentMessages, userMessage])
+                        }, 300)
+                      }
+                    }, 100)
+                  }}
+                  className="w-full text-left bg-gray-800/50 hover:bg-gray-700/50 text-gray-300 rounded-lg px-3 py-2.5 text-sm transition-colors border border-gray-700/50 hover:border-[#14F195]/50"
+                >
+                  {question.text}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Follow-Up Questions */}
+        {followUpQuestions && followUpQuestions.length > 0 && !isTyping && (
+          <div className="flex justify-start animate-fade-in">
+            <div className="max-w-[75%] space-y-2">
+              <p className="text-xs text-gray-500 px-1 mb-1">Tap to continue:</p>
+              {followUpQuestions.map((question, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    setInputValue(question.text)
+                    handleSend()
+                  }}
+                  className="w-full text-left bg-gray-800/50 hover:bg-gray-700/50 text-gray-300 rounded-lg px-3 py-2.5 text-sm transition-colors border border-gray-700/50 hover:border-[#14F195]/50"
+                >
+                  {question.text}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Typing Indicator */}
         {isTyping && (
           <div className="flex justify-start">
@@ -561,50 +989,6 @@ export default function ChatPage() {
         )}
 
         <div ref={messagesEndRef} />
-      </div>
-
-      {/* Quick Action Buttons */}
-      <div className="px-4 py-2 flex gap-2 overflow-x-auto">
-        <button 
-          onClick={() => handleModeChange('practice')}
-          className={`whitespace-nowrap px-4 py-2 rounded-full text-sm transition-colors ${
-            conversationMode === 'practice' 
-              ? 'bg-user-bubble text-white' 
-              : 'bg-ai-bubble hover:bg-gray-700'
-          }`}
-        >
-          Practice conversations
-        </button>
-        <button 
-          onClick={() => handleModeChange('vent')}
-          className={`whitespace-nowrap px-4 py-2 rounded-full text-sm transition-colors ${
-            conversationMode === 'vent' 
-              ? 'bg-user-bubble text-white' 
-              : 'bg-ai-bubble hover:bg-gray-700'
-          }`}
-        >
-          I need to vent
-        </button>
-        <button 
-          onClick={() => handleModeChange('coaching')}
-          className={`whitespace-nowrap px-4 py-2 rounded-full text-sm transition-colors ${
-            conversationMode === 'coaching' 
-              ? 'bg-user-bubble text-white' 
-              : 'bg-ai-bubble hover:bg-gray-700'
-          }`}
-        >
-          Help me decide
-        </button>
-        <button 
-          onClick={() => handleModeChange('chat')}
-          className={`whitespace-nowrap px-4 py-2 rounded-full text-sm transition-colors ${
-            conversationMode === 'chat' 
-              ? 'bg-user-bubble text-white' 
-              : 'bg-ai-bubble hover:bg-gray-700'
-          }`}
-        >
-          Just chat
-        </button>
       </div>
 
       {/* Input Area */}
@@ -622,7 +1006,7 @@ export default function ChatPage() {
           <button
             onClick={handleSend}
             disabled={!inputValue.trim()}
-            className="bg-user-bubble hover:bg-blue-600 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-full p-3 transition-colors"
+            className="bg-gradient-to-r from-[#14F195] to-[#0EA5E9] hover:from-[#0EA5E9] hover:to-[#14F195] disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed rounded-full p-3 transition-all"
           >
             <svg
               className="w-5 h-5"
@@ -640,6 +1024,168 @@ export default function ChatPage() {
           </button>
         </div>
       </div>
+
+      {/* Conversations Sidebar */}
+      {showConversationsSidebar && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black/50 z-40 animate-fade-in"
+            onClick={() => setShowConversationsSidebar(false)}
+          />
+          
+          {/* Sidebar */}
+          <div className="fixed top-0 right-0 h-full w-full sm:w-96 bg-[#1a1a24] shadow-2xl z-50 flex flex-col animate-slide-in-right">
+            {/* Sidebar Header */}
+            <div className="flex items-center justify-between px-4 py-4 border-b border-gray-800">
+              <h2 className="text-lg font-semibold text-white">Conversations</h2>
+              <button
+                onClick={() => setShowConversationsSidebar(false)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Conversations List */}
+            <div className="flex-1 overflow-y-auto px-4 py-4">
+              {(() => {
+                if (!currentUser) return null
+                
+                const allConvos = getAllConversations(currentUser.username)
+                
+                if (allConvos.length === 0) {
+                  return (
+                    <div className="text-center py-20">
+                      <div className="mb-3 flex justify-center">
+                        <svg className="w-12 h-12 text-gray-600" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
+                      <p className="text-gray-400 text-sm">No saved conversations yet</p>
+                    </div>
+                  )
+                }
+                
+                // Group conversations
+                const grouped = allConvos.reduce((acc, conv) => {
+                  const date = new Date(conv.lastMessageAt)
+                  const today = new Date()
+                  const yesterday = new Date(today)
+                  yesterday.setDate(yesterday.getDate() - 1)
+                  
+                  let group = 'Older'
+                  if (date.toDateString() === today.toDateString()) {
+                    group = 'Today'
+                  } else if (date.toDateString() === yesterday.toDateString()) {
+                    group = 'Yesterday'
+                  } else if (date > new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)) {
+                    group = 'This Week'
+                  }
+                  
+                  if (!acc[group]) acc[group] = []
+                  acc[group].push(conv)
+                  return acc
+                }, {} as Record<string, typeof allConvos>)
+                
+                const groupOrder = ['Today', 'Yesterday', 'This Week', 'Older']
+                
+                const formatDate = (dateString: string) => {
+                  const date = new Date(dateString)
+                  const now = new Date()
+                  const diff = now.getTime() - date.getTime()
+                  const hours = diff / (1000 * 60 * 60)
+                  
+                  if (hours < 1) {
+                    const minutes = Math.floor(diff / (1000 * 60))
+                    return minutes < 1 ? 'Just now' : `${minutes}m`
+                  } else if (hours < 24) {
+                    return `${Math.floor(hours)}h`
+                  } else {
+                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                  }
+                }
+                
+                return (
+                  <div className="space-y-4">
+                    {groupOrder.map(group => {
+                      const groupConvos = grouped[group]
+                      if (!groupConvos || groupConvos.length === 0) return null
+                      
+                      return (
+                        <div key={group}>
+                          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-1">
+                            {group}
+                          </h3>
+                          <div className="space-y-1">
+                            {groupConvos.map(conv => {
+                              const personality = getPersonality(conv.personality)
+                              const isActive = conv.id === currentConversationId
+                              
+                              return (
+                                <button
+                                  key={conv.id}
+                                  onClick={() => {
+                                    if (conv.id !== currentConversationId) {
+                                      router.push(`/chat?conversation=${conv.id}`)
+                                    }
+                                    setShowConversationsSidebar(false)
+                                  }}
+                                  className={`w-full rounded-lg p-3 transition-colors text-left ${
+                                    isActive 
+                                      ? 'bg-user-bubble/20 border border-user-bubble/50' 
+                                      : 'bg-ai-bubble/50 hover:bg-ai-bubble'
+                                  }`}
+                                >
+                                  <div className="flex items-start space-x-3">
+                                    <PersonalityAvatar personalityId={personality.id} size="sm" />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center justify-between mb-1">
+                                        <span className="font-semibold text-sm text-white">{personality.name}</span>
+                                        <span className="text-xs text-gray-500">{formatDate(conv.lastMessageAt)}</span>
+                                      </div>
+                                      <p className="text-xs text-gray-400 truncate">{conv.preview}</p>
+                                      {isActive && (
+                                        <span className="text-xs text-user-bubble mt-1 inline-block">Current</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
+            </div>
+
+            {/* New Chat Button */}
+            <div className="border-t border-gray-800 p-4">
+              <button
+                onClick={() => {
+                  setShowConversationsSidebar(false)
+                  // Create new conversation by clearing active and refreshing
+                  if (currentUser) {
+                    clearActiveConversation(currentUser.username, selectedPersonality)
+                    router.push('/chat')
+                  }
+                }}
+                className="w-full py-3 bg-user-bubble hover:bg-user-bubble/80 text-white rounded-lg transition-colors flex items-center justify-center space-x-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                <span>New Chat</span>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

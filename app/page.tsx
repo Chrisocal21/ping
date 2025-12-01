@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { getCurrentUser, logout, type User } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
+import { PingWordmark } from '@/components/PingLogo'
 
 export default function LandingPage() {
   const router = useRouter()
@@ -37,9 +38,11 @@ export default function LandingPage() {
         )}
 
         {/* Logo / Name */}
-        <div className="space-y-2">
-          <h1 className="text-7xl font-bold tracking-tight">Ping</h1>
-          <p className="text-lg text-gray-400">
+        <div className="space-y-6">
+          <div className="flex justify-center">
+            <PingWordmark className="scale-[2]" />
+          </div>
+          <p className="text-lg text-gray-400 mt-8">
             Your AI companion
           </p>
         </div>
@@ -49,14 +52,14 @@ export default function LandingPage() {
           {user ? (
             <Link
               href="/chat"
-              className="block bg-user-bubble hover:bg-blue-600 transition-colors px-8 py-5 rounded-full text-xl font-semibold"
+              className="block bg-gradient-to-r from-[#14F195] to-[#0EA5E9] hover:from-[#0EA5E9] hover:to-[#14F195] transition-all px-8 py-5 rounded-full text-xl font-semibold text-gray-900"
             >
               Continue
             </Link>
           ) : (
             <Link
               href="/login"
-              className="block bg-user-bubble hover:bg-blue-600 transition-colors px-8 py-5 rounded-full text-xl font-semibold"
+              className="block bg-gradient-to-r from-[#14F195] to-[#0EA5E9] hover:from-[#0EA5E9] hover:to-[#14F195] transition-all px-8 py-5 rounded-full text-xl font-semibold text-gray-900"
             >
               Sign In
             </Link>

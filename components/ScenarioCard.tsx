@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { Scenario, ScenarioOption, getToneColor, getToneDescription } from '@/lib/scenarios'
 
 interface ScenarioCardProps {
@@ -7,7 +8,7 @@ interface ScenarioCardProps {
   onOptionSelect: (option: ScenarioOption) => void
 }
 
-export default function ScenarioCard({ scenario, onOptionSelect }: ScenarioCardProps) {
+const ScenarioCard = memo(function ScenarioCard({ scenario, onOptionSelect }: ScenarioCardProps) {
   return (
     <div className="bg-ai-bubble rounded-2xl p-5 space-y-4 border border-gray-700">
       {/* Scenario Setup */}
@@ -39,7 +40,7 @@ export default function ScenarioCard({ scenario, onOptionSelect }: ScenarioCardP
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1">
-                <p className="text-white text-[15px] group-hover:text-blue-400 transition-colors">
+                <p className="text-white text-[15px] group-hover:bg-gradient-to-r group-hover:from-[#14F195] group-hover:to-[#0EA5E9] group-hover:bg-clip-text group-hover:text-transparent transition-all">
                   {option.text}
                 </p>
                 <p className="text-xs text-gray-500 mt-1 capitalize">
@@ -79,4 +80,6 @@ export default function ScenarioCard({ scenario, onOptionSelect }: ScenarioCardP
       </div>
     </div>
   )
-}
+})
+
+export default ScenarioCard

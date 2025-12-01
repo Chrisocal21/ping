@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { login } from '@/lib/auth'
+import { PingWordmark } from '@/components/PingLogo'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -28,8 +29,10 @@ export default function LoginPage() {
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="max-w-md w-full space-y-8">
         {/* Header */}
-        <div className="text-center space-y-3">
-          <h1 className="text-6xl font-bold tracking-tight">Ping</h1>
+        <div className="text-center space-y-5">
+          <div className="flex justify-center">
+            <PingWordmark className="scale-150" />
+          </div>
           <p className="text-gray-400">
             {isSignUp ? 'Create your account' : 'Welcome back'}
           </p>
@@ -67,7 +70,7 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            className="w-full bg-user-bubble hover:bg-blue-600 transition-colors px-8 py-4 rounded-full text-lg font-semibold"
+            className="w-full bg-gradient-to-r from-[#14F195] to-[#0EA5E9] hover:from-[#0EA5E9] hover:to-[#14F195] transition-all px-8 py-4 rounded-full text-lg font-semibold text-gray-900"
           >
             {isSignUp ? 'Sign Up' : 'Sign In'}
           </button>

@@ -49,28 +49,131 @@ export function updateLastVisit(): void {
   localStorage.setItem('ping_last_visit', new Date().toISOString())
 }
 
-export function getWelcomeMessage(lastVisit: Date | null): string {
+// Personality-specific greeting variations
+const greetingsByPersonality: Record<string, {
+  sameDay: string[]
+  nextDay: string[]
+  fewDays: string[]
+  longTime: string[]
+}> = {
+  max: {
+    sameDay: [
+      "Hey again. What's on your mind?",
+      "Welcome back. What's going on?",
+      "Hey. What do you want to talk about?"
+    ],
+    nextDay: [
+      "Hey. New day, new chaos. What's on your mind?",
+      "Good to see you. What's happening today?",
+      "Hey there. How are things going?"
+    ],
+    fewDays: [
+      "Hey, been a minute. No guilt — I'm not tracking attendance. What's going on?",
+      "Hey. Been a few days. What's new?",
+      "Welcome back. What's been happening?"
+    ],
+    longTime: [
+      "Well look who's back. Missed you. Genuinely. What's happening in your world?",
+      "Hey! It's been a while. How have you been?",
+      "Good to see you again. What's on your mind?"
+    ]
+  },
+  jamie: {
+    sameDay: [
+      "Hey! You're back! What's up?",
+      "There you are! What's happening?",
+      "Hey hey! What do you want to work on?"
+    ],
+    nextDay: [
+      "Morning! Ready to tackle today?",
+      "New day, new possibilities! What's up?",
+      "Hey! How's today treating you?"
+    ],
+    fewDays: [
+      "Look who it is! Missed you! What's new?",
+      "Hey! Been thinking about you. How are things?",
+      "There you are! What's been going on?"
+    ],
+    longTime: [
+      "OMG you're back! I'm so glad to see you! What have you been up to?",
+      "Hey stranger! Welcome back! Tell me everything!",
+      "You're here! Seriously so good to see you. How have you been?"
+    ]
+  },
+  sage: {
+    sameDay: [
+      "Back already. What are you thinking about?",
+      "Hello again. What's on your mind?",
+      "Returning so soon. What brings you here?"
+    ],
+    nextDay: [
+      "Another day. How are you approaching it?",
+      "Good to see you. What's present for you today?",
+      "Hello. What's calling your attention?"
+    ],
+    fewDays: [
+      "Some time has passed. How have things evolved?",
+      "Welcome back. What's shifted for you?",
+      "It's been a few days. What are you noticing?"
+    ],
+    longTime: [
+      "Quite some time has passed. I'm curious what brings you back now.",
+      "Hello again. What's different since we last spoke?",
+      "Welcome back. I wonder what's present for you today."
+    ]
+  },
+  riley: {
+    sameDay: [
+      "Back for more? Cool. What's up?",
+      "Yo. What do you need?",
+      "Hey. What's the situation?"
+    ],
+    nextDay: [
+      "New day. What's the move?",
+      "Sup. What's on your radar today?",
+      "Hey. What are we dealing with?"
+    ],
+    fewDays: [
+      "Been MIA. No judgment. What's up?",
+      "Where you been? Anyway, what's going on?",
+      "Look who decided to show up. What's happening?"
+    ],
+    longTime: [
+      "Damn, it's been a minute. You good? What's new?",
+      "Well well. Long time. What's been going on?",
+      "Yo, where have you been? Fill me in."
+    ]
+  }
+}
+
+export function getWelcomeMessage(lastVisit: Date | null, personalityId: string = 'max'): string {
   if (!lastVisit) {
-    // First time user
-    return "Hey. I'm Max. I'm here when you want to practice talking to humans, need to vent, or just want help figuring something out. No judgment, no therapy-speak, no weird positivity. What's on your mind?"
+    // First time user - warm and welcoming
+    return "Hey there. I'm here to help you practice conversations, work through what's on your mind, or just talk things out. No judgment. What would you like to chat about?"
   }
 
   const now = new Date()
   const hoursSinceLastVisit = (now.getTime() - lastVisit.getTime()) / (1000 * 60 * 60)
+  
+  const greetings = greetingsByPersonality[personalityId] || greetingsByPersonality.max
+  let options: string[]
 
   if (hoursSinceLastVisit < 12) {
     // Same day
-    return "Back already? I respect the hustle. What's up?"
+    options = greetings.sameDay
   } else if (hoursSinceLastVisit < 48) {
     // Next day
-    return "Hey. New day, new chaos. What's on your mind?"
+    options = greetings.nextDay
   } else if (hoursSinceLastVisit < 168) {
     // Within a week
-    return "Hey, been a minute. No guilt — I'm not tracking attendance. What's going on?"
+    options = greetings.fewDays
   } else {
     // Long absence
-    return "Well look who's back. Missed you. Genuinely. What's happening in your world?"
+    options = greetings.longTime
   }
+
+  // Return a random greeting from the appropriate category
+  return options[Math.floor(Math.random() * options.length)]
 }
 
 export function getModeSystemPrompt(mode: ConversationMode): string {

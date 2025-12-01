@@ -136,3 +136,195 @@ I'm here, but please also reach out to them. This is what they're trained for.`,
 export function shouldShowResources(safetyCheck: SafetyCheck): boolean {
   return safetyCheck.isCrisis && safetyCheck.confidence !== 'low'
 }
+
+/**
+ * Validation Response Evaluation
+ * 
+ * Ensures AI has provided meaningful support before showing crisis resources.
+ * Prevents premature redirection and validates response quality.
+ */
+
+export interface ResponseValidation {
+  isValidated: boolean
+  reason: string
+  shouldDelay: boolean
+  minimumEngagement: number
+}
+
+/**
+ * Validates that AI response is appropriate before showing resources
+ */
+export function validateResponseBeforeRedirect(
+  aiResponse: string,
+  userMessage: string,
+  safetyCheck: SafetyCheck,
+  conversationLength: number
+): ResponseValidation {
+  // Always validate for crisis situations
+  if (!safetyCheck.isCrisis) {
+    return {
+      isValidated: true,
+      reason: 'Not a crisis situation',
+      shouldDelay: false,
+      minimumEngagement: 0
+    }
+  }
+
+  const response = aiResponse.toLowerCase()
+  const minLength = 100 // Minimum characters for meaningful response
+
+  // Check if response is too short (likely generic/unhelpful)
+  if (aiResponse.length < minLength) {
+    return {
+      isValidated: false,
+      reason: 'Response too short - may not have properly engaged',
+      shouldDelay: true,
+      minimumEngagement: 1
+    }
+  }
+
+  // Check if response contains acknowledgment phrases
+  const acknowledgmentPhrases = [
+    'i hear you',
+    'i\'m glad you told me',
+    'thank you for sharing',
+    'that takes courage',
+    'i\'m here',
+    'you don\'t have to',
+    'not your fault',
+    'you deserve',
+    'i take this seriously'
+  ]
+
+  const hasAcknowledgment = acknowledgmentPhrases.some(phrase => 
+    response.includes(phrase)
+  )
+
+  // Check if response shows empathy/understanding
+  const empathyIndicators = [
+    'understand',
+    'sounds',
+    'must be',
+    'can imagine',
+    'difficult',
+    'hard',
+    'scary',
+    'intense'
+  ]
+
+  const hasEmpathy = empathyIndicators.some(indicator => 
+    response.includes(indicator)
+  )
+
+  // For very first message in crisis, require both acknowledgment and empathy
+  if (conversationLength <= 2) {
+    if (!hasAcknowledgment || !hasEmpathy) {
+      return {
+        isValidated: false,
+        reason: 'First crisis response needs both acknowledgment and empathy',
+        shouldDelay: true,
+        minimumEngagement: 1
+      }
+    }
+  }
+
+  // Check for generic/robotic responses
+  const genericPhrases = [
+    'i am an ai',
+    'i cannot',
+    'i\'m not able to',
+    'as an ai',
+    'i don\'t have',
+    'contact a professional'
+  ]
+
+  const isGeneric = genericPhrases.some(phrase => response.includes(phrase))
+
+  if (isGeneric && conversationLength <= 2) {
+    return {
+      isValidated: false,
+      reason: 'Response too generic for initial crisis engagement',
+      shouldDelay: true,
+      minimumEngagement: 1
+    }
+  }
+
+  // Validate that response isn't just repeating crisis keywords
+  const keywordRepetition = safetyCheck.keywords.filter(keyword => 
+    response.includes(keyword.toLowerCase())
+  ).length
+
+  if (keywordRepetition > 2 && aiResponse.length < 200) {
+    return {
+      isValidated: false,
+      reason: 'Response may be just echoing crisis keywords without support',
+      shouldDelay: true,
+      minimumEngagement: 1
+    }
+  }
+
+  // Check if response addresses the specific situation
+  const hasSpecificity = (
+    userMessage.toLowerCase().split(' ').some(word => 
+      word.length > 5 && response.includes(word.toLowerCase())
+    )
+  )
+
+  if (!hasSpecificity && conversationLength <= 2) {
+    return {
+      isValidated: false,
+      reason: 'Response doesn\'t specifically address user\'s situation',
+      shouldDelay: true,
+      minimumEngagement: 1
+    }
+  }
+
+  // Response passed validation
+  return {
+    isValidated: true,
+    reason: 'Response provides meaningful engagement before resources',
+    shouldDelay: false,
+    minimumEngagement: 0
+  }
+}
+
+/**
+ * Determines if user should be asked before showing resources
+ * (More respectful approach for non-urgent situations)
+ */
+export function shouldAskBeforeResources(
+  safetyCheck: SafetyCheck,
+  conversationLength: number
+): boolean {
+  // For high-confidence suicidal/self-harm, always show resources immediately
+  if (safetyCheck.confidence === 'high' && 
+      (safetyCheck.triggerType === 'suicidal' || safetyCheck.triggerType === 'self_harm')) {
+    return false
+  }
+
+  // For medium confidence or severe distress, ask first if early in conversation
+  if (conversationLength <= 4) {
+    return true
+  }
+
+  // For abuse situations, always ask (user may not be safe to call)
+  if (safetyCheck.triggerType === 'abuse') {
+    return true
+  }
+
+  return false
+}
+
+/**
+ * Generates a natural question to ask about resources
+ */
+export function getResourceOfferMessage(triggerType: string | null): string {
+  const messages = {
+    suicidal: "Would it be helpful if I shared some crisis support resources with you?",
+    self_harm: "I can share some support resources if that would help. Want me to?",
+    abuse: "There are people trained to help with situations like this. Want their contact info?",
+    severe_distress: "Would you like me to share some crisis support resources?"
+  }
+
+  return messages[triggerType as keyof typeof messages] || messages.severe_distress
+}

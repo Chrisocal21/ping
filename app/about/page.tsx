@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { PersonalityAvatar } from '@/components/PersonalityAvatar'
 
 export default function AboutPage() {
   const router = useRouter()
@@ -12,7 +13,7 @@ export default function AboutPage() {
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <button
             onClick={() => router.back()}
-            className="text-gray-400 hover:text-white transition-colors"
+            className="text-gray-400 hover:bg-gradient-to-r hover:from-[#14F195] hover:to-[#0EA5E9] hover:bg-clip-text hover:text-transparent transition-all"
           >
             ← Back
           </button>
@@ -24,8 +25,12 @@ export default function AboutPage() {
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
         {/* Hero Section */}
         <section className="text-center space-y-4 py-8">
-          <div className="text-6xl mb-4">💬</div>
-          <h2 className="text-3xl font-bold">Your AI companion for real-life moments</h2>
+          <div className="inline-flex items-center justify-center w-24 h-24 mb-4">
+            <svg className="w-full h-full text-[#14F195]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+          </div>
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-[#14F195] to-[#0EA5E9] bg-clip-text text-transparent">Your AI companion for real-life moments</h2>
           <p className="text-lg text-gray-400 max-w-2xl mx-auto">
             Practice social skills, vent safely, and think through decisions—without judgment.
           </p>
@@ -54,7 +59,7 @@ export default function AboutPage() {
           <div className="grid md:grid-cols-2 gap-4">
             <div className="bg-[#1a1a24] rounded-lg p-6 space-y-3">
               <div className="flex items-center space-x-3 mb-2">
-                <span className="text-4xl">🧠</span>
+                <PersonalityAvatar personalityId="max" size="xl" />
                 <h4 className="text-xl font-semibold">Max</h4>
               </div>
               <p className="text-sm text-gray-400 mb-3">The Thoughtful Guide</p>
@@ -72,7 +77,7 @@ export default function AboutPage() {
 
             <div className="bg-[#1a1a24] rounded-lg p-6 space-y-3">
               <div className="flex items-center space-x-3 mb-2">
-                <span className="text-4xl">⚡</span>
+                <PersonalityAvatar personalityId="jamie" size="xl" />
                 <h4 className="text-xl font-semibold">Jamie</h4>
               </div>
               <p className="text-sm text-gray-400 mb-3">The Energetic Hype Person</p>
@@ -90,7 +95,7 @@ export default function AboutPage() {
 
             <div className="bg-[#1a1a24] rounded-lg p-6 space-y-3">
               <div className="flex items-center space-x-3 mb-2">
-                <span className="text-4xl">🌿</span>
+                <PersonalityAvatar personalityId="sage" size="xl" />
                 <h4 className="text-xl font-semibold">Sage</h4>
               </div>
               <p className="text-sm text-gray-400 mb-3">The Calm Companion</p>
@@ -108,7 +113,7 @@ export default function AboutPage() {
 
             <div className="bg-[#1a1a24] rounded-lg p-6 space-y-3">
               <div className="flex items-center space-x-3 mb-2">
-                <span className="text-4xl">😏</span>
+                <PersonalityAvatar personalityId="riley" size="xl" />
                 <h4 className="text-xl font-semibold">Riley</h4>
               </div>
               <p className="text-sm text-gray-400 mb-3">The Witty Realist</p>
@@ -132,7 +137,7 @@ export default function AboutPage() {
           
           <div className="space-y-4">
             <div className="flex items-start space-x-4">
-              <div className="flex-shrink-0 w-8 h-8 bg-user-bubble rounded-full flex items-center justify-center font-semibold text-sm">
+              <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-[#14F195] to-[#0EA5E9] rounded-full flex items-center justify-center font-semibold text-sm text-gray-900">
                 1
               </div>
               <div>
@@ -145,7 +150,7 @@ export default function AboutPage() {
             </div>
 
             <div className="flex items-start space-x-4">
-              <div className="flex-shrink-0 w-8 h-8 bg-user-bubble rounded-full flex items-center justify-center font-semibold text-sm">
+              <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-[#14F195] to-[#0EA5E9] rounded-full flex items-center justify-center font-semibold text-sm text-gray-900">
                 2
               </div>
               <div>
@@ -158,7 +163,7 @@ export default function AboutPage() {
             </div>
 
             <div className="flex items-start space-x-4">
-              <div className="flex-shrink-0 w-8 h-8 bg-user-bubble rounded-full flex items-center justify-center font-semibold text-sm">
+              <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-[#14F195] to-[#0EA5E9] rounded-full flex items-center justify-center font-semibold text-sm text-gray-900">
                 3
               </div>
               <div>
@@ -171,7 +176,7 @@ export default function AboutPage() {
             </div>
 
             <div className="flex items-start space-x-4">
-              <div className="flex-shrink-0 w-8 h-8 bg-user-bubble rounded-full flex items-center justify-center font-semibold text-sm">
+              <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-[#14F195] to-[#0EA5E9] rounded-full flex items-center justify-center font-semibold text-sm text-gray-900">
                 4
               </div>
               <div>
@@ -185,47 +190,7 @@ export default function AboutPage() {
           </div>
         </section>
 
-        {/* Four Modes */}
-        <section className="space-y-4">
-          <h3 className="text-2xl font-semibold">Quick Action Buttons (Optional)</h3>
-          <p className="text-sm text-gray-400">
-            The AI detects your needs automatically, but you can use these shortcuts to jump right in:
-          </p>
-          
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="bg-[#1a1a24] rounded-lg p-6 space-y-2">
-              <h4 className="text-lg font-semibold">🎭 Practice Conversations</h4>
-              <p className="text-sm text-gray-400">
-                Work through 50+ realistic social scenarios with multiple response options. 
-                Get feedback, practice different communication styles, and build confidence.
-              </p>
-            </div>
 
-            <div className="bg-[#1a1a24] rounded-lg p-6 space-y-2">
-              <h4 className="text-lg font-semibold">💨 Vent Mode</h4>
-              <p className="text-sm text-gray-400">
-                Just need to let it out? Vent mode provides validation and emotional 
-                support without trying to fix everything. Sometimes you just need to be heard.
-              </p>
-            </div>
-
-            <div className="bg-[#1a1a24] rounded-lg p-6 space-y-2">
-              <h4 className="text-lg font-semibold">🤔 Coaching Mode</h4>
-              <p className="text-sm text-gray-400">
-                Stuck on a decision? Access 20 evidence-based coaching frameworks to 
-                think through choices, set boundaries, and clarify your values.
-              </p>
-            </div>
-
-            <div className="bg-[#1a1a24] rounded-lg p-6 space-y-2">
-              <h4 className="text-lg font-semibold">💬 Free Chat</h4>
-              <p className="text-sm text-gray-400">
-                Have a casual conversation about anything. No structure, no agenda—just 
-                talk to your AI friend about whatever's on your mind.
-              </p>
-            </div>
-          </div>
-        </section>
 
         {/* Key Features */}
         <section className="bg-[#1a1a24] rounded-lg p-8 space-y-4">
@@ -233,7 +198,7 @@ export default function AboutPage() {
           
           <div className="grid md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
             <div className="flex items-start space-x-3">
-              <span className="text-green-400 text-xl">✓</span>
+              <span className="text-xl bg-gradient-to-r from-[#14F195] to-[#0EA5E9] bg-clip-text text-transparent">✓</span>
               <div>
                 <p className="font-semibold mb-1">Learns Your Style</p>
                 <p className="text-gray-400">AI adapts to your communication preferences and emotional patterns over time</p>
@@ -241,7 +206,7 @@ export default function AboutPage() {
             </div>
 
             <div className="flex items-start space-x-3">
-              <span className="text-green-400 text-xl">✓</span>
+              <span className="text-xl bg-gradient-to-r from-[#14F195] to-[#0EA5E9] bg-clip-text text-transparent">✓</span>
               <div>
                 <p className="font-semibold mb-1">Completely Private</p>
                 <p className="text-gray-400">All data stored locally on your device—no cloud storage, no tracking</p>
@@ -249,7 +214,7 @@ export default function AboutPage() {
             </div>
 
             <div className="flex items-start space-x-3">
-              <span className="text-green-400 text-xl">✓</span>
+              <span className="text-xl bg-gradient-to-r from-[#14F195] to-[#0EA5E9] bg-clip-text text-transparent">✓</span>
               <div>
                 <p className="font-semibold mb-1">Infinite Scenarios</p>
                 <p className="text-gray-400">AI generates unlimited variations of practice scenarios based on your needs</p>
@@ -257,7 +222,7 @@ export default function AboutPage() {
             </div>
 
             <div className="flex items-start space-x-3">
-              <span className="text-green-400 text-xl">✓</span>
+              <span className="text-xl bg-gradient-to-r from-[#14F195] to-[#0EA5E9] bg-clip-text text-transparent">✓</span>
               <div>
                 <p className="font-semibold mb-1">Evidence-Based</p>
                 <p className="text-gray-400">Built on real coaching frameworks and emotional support best practices</p>
@@ -265,7 +230,7 @@ export default function AboutPage() {
             </div>
 
             <div className="flex items-start space-x-3">
-              <span className="text-green-400 text-xl">✓</span>
+              <span className="text-xl bg-gradient-to-r from-[#14F195] to-[#0EA5E9] bg-clip-text text-transparent">✓</span>
               <div>
                 <p className="font-semibold mb-1">Crisis Support</p>
                 <p className="text-gray-400">Automatic detection with immediate resources for crisis situations</p>
@@ -273,7 +238,7 @@ export default function AboutPage() {
             </div>
 
             <div className="flex items-start space-x-3">
-              <span className="text-green-400 text-xl">✓</span>
+              <span className="text-xl bg-gradient-to-r from-[#14F195] to-[#0EA5E9] bg-clip-text text-transparent">✓</span>
               <div>
                 <p className="font-semibold mb-1">Your Data, Your Control</p>
                 <p className="text-gray-400">Export, import, or delete your data anytime—you're in complete control</p>
@@ -289,7 +254,12 @@ export default function AboutPage() {
           <div className="space-y-6 text-gray-300">
             {/* Our Mission */}
             <div className="bg-gray-800/30 rounded-lg p-6 border border-gray-700">
-              <h4 className="font-semibold text-white mb-3 text-lg">💙 Our Mission</h4>
+              <h4 className="font-semibold text-white mb-3 text-lg flex items-center gap-2">
+                <svg className="w-5 h-5 text-[#14F195]" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
+                Our Mission
+              </h4>
               <p className="text-sm text-gray-300 leading-relaxed mb-3">
                 Ping exists for people who need support but might not have anyone to turn to—or 
                 who simply find it hard to let people in. We're here for those moments when you 
@@ -307,7 +277,12 @@ export default function AboutPage() {
 
             {/* Privacy */}
             <div>
-              <h4 className="font-semibold text-white mb-3">🔒 Your Privacy Matters</h4>
+              <h4 className="font-semibold text-white mb-3 flex items-center gap-2">
+                <svg className="w-5 h-5 text-[#14F195]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                Your Privacy Matters
+              </h4>
               <ul className="space-y-2 text-sm list-disc list-inside text-gray-400">
                 <li>All data is stored locally on your device using localStorage</li>
                 <li>No data is sent to external servers (except OpenAI for AI responses)</li>
@@ -321,7 +296,12 @@ export default function AboutPage() {
 
             {/* Crisis Detection */}
             <div>
-              <h4 className="font-semibold text-white mb-3">🆘 Crisis Detection & Resources</h4>
+              <h4 className="font-semibold text-white mb-3 flex items-center gap-2">
+                <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                Crisis Detection & Resources
+              </h4>
               <p className="text-sm text-gray-400 mb-4">
                 Ping includes automatic crisis detection for suicidal ideation, self-harm, 
                 abuse, and severe distress. If detected, you'll immediately receive crisis 
@@ -333,19 +313,19 @@ export default function AboutPage() {
                 
                 <div className="space-y-3 text-sm">
                   <div>
-                    <p className="text-white font-medium mb-1">🇺🇸 National Suicide Prevention Lifeline</p>
+                    <p className="text-white font-medium mb-1">National Suicide Prevention Lifeline</p>
                     <p className="text-gray-300">Call or text: <a href="tel:988" className="text-red-300 hover:text-red-200 underline">988</a></p>
                     <p className="text-gray-400 text-xs">24/7 support in English and Spanish</p>
                   </div>
 
                   <div>
-                    <p className="text-white font-medium mb-1">💬 Crisis Text Line</p>
+                    <p className="text-white font-medium mb-1">Crisis Text Line</p>
                     <p className="text-gray-300">Text HOME to <a href="sms:741741" className="text-red-300 hover:text-red-200 underline">741741</a></p>
                     <p className="text-gray-400 text-xs">Free, 24/7 support via text message</p>
                   </div>
 
                   <div>
-                    <p className="text-white font-medium mb-1">🌍 International Association for Suicide Prevention</p>
+                    <p className="text-white font-medium mb-1">International Association for Suicide Prevention</p>
                     <p className="text-gray-300">
                       <a href="https://www.iasp.info/resources/Crisis_Centres/" target="_blank" rel="noopener noreferrer" className="text-red-300 hover:text-red-200 underline">
                         Find crisis centers worldwide
@@ -354,13 +334,13 @@ export default function AboutPage() {
                   </div>
 
                   <div>
-                    <p className="text-white font-medium mb-1">📱 SAMHSA National Helpline</p>
+                    <p className="text-white font-medium mb-1">SAMHSA National Helpline</p>
                     <p className="text-gray-300">Call: <a href="tel:1-800-662-4357" className="text-red-300 hover:text-red-200 underline">1-800-662-HELP (4357)</a></p>
                     <p className="text-gray-400 text-xs">Treatment referral and information (substance abuse & mental health)</p>
                   </div>
 
                   <div>
-                    <p className="text-white font-medium mb-1">🚨 Emergency</p>
+                    <p className="text-white font-medium mb-1">Emergency</p>
                     <p className="text-gray-300">Call <a href="tel:911" className="text-red-300 hover:text-red-200 underline">911</a> or go to your nearest emergency room</p>
                     <p className="text-gray-400 text-xs">If you or someone else is in immediate danger</p>
                   </div>
@@ -370,7 +350,12 @@ export default function AboutPage() {
 
             {/* Finding Professional Help */}
             <div>
-              <h4 className="font-semibold text-white mb-3">🩺 Finding Professional Help</h4>
+              <h4 className="font-semibold text-white mb-3 flex items-center gap-2">
+                <svg className="w-5 h-5 text-[#14F195]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+                Finding Professional Help
+              </h4>
               <p className="text-sm text-gray-400 mb-4">
                 While Ping can provide support and practice, it's not a substitute for 
                 professional mental health care. If you're struggling with serious mental 
@@ -382,22 +367,22 @@ export default function AboutPage() {
                   <p className="text-white font-medium mb-2">Find a Therapist</p>
                   <ul className="space-y-2 text-gray-400">
                     <li>
-                      <a href="https://www.psychologytoday.com/us/therapists" target="_blank" rel="noopener noreferrer" className="text-user-bubble hover:text-blue-400 underline">
+                      <a href="https://www.psychologytoday.com/us/therapists" target="_blank" rel="noopener noreferrer" className="text-user-bubble hover:bg-gradient-to-r hover:from-[#14F195] hover:to-[#0EA5E9] hover:bg-clip-text hover:text-transparent underline transition-all">
                         Psychology Today Therapist Finder
                       </a> - Search by location, insurance, and specialty
                     </li>
                     <li>
-                      <a href="https://www.betterhelp.com" target="_blank" rel="noopener noreferrer" className="text-user-bubble hover:text-blue-400 underline">
+                      <a href="https://www.betterhelp.com" target="_blank" rel="noopener noreferrer" className="text-user-bubble hover:bg-gradient-to-r hover:from-[#14F195] hover:to-[#0EA5E9] hover:bg-clip-text hover:text-transparent underline transition-all">
                         BetterHelp
                       </a> - Online therapy (text, video, or phone)
                     </li>
                     <li>
-                      <a href="https://www.talkspace.com" target="_blank" rel="noopener noreferrer" className="text-user-bubble hover:text-blue-400 underline">
+                      <a href="https://www.talkspace.com" target="_blank" rel="noopener noreferrer" className="text-user-bubble hover:bg-gradient-to-r hover:from-[#14F195] hover:to-[#0EA5E9] hover:bg-clip-text hover:text-transparent underline transition-all">
                         Talkspace
                       </a> - Affordable online therapy platform
                     </li>
                     <li>
-                      <a href="https://openpathcollective.org" target="_blank" rel="noopener noreferrer" className="text-user-bubble hover:text-blue-400 underline">
+                      <a href="https://openpathcollective.org" target="_blank" rel="noopener noreferrer" className="text-user-bubble hover:bg-gradient-to-r hover:from-[#14F195] hover:to-[#0EA5E9] hover:bg-clip-text hover:text-transparent underline transition-all">
                         Open Path Collective
                       </a> - In-person therapy $30-$80 per session
                     </li>
@@ -408,12 +393,12 @@ export default function AboutPage() {
                   <p className="text-white font-medium mb-2">Free & Low-Cost Resources</p>
                   <ul className="space-y-2 text-gray-400">
                     <li>
-                      <a href="https://www.nami.org/help" target="_blank" rel="noopener noreferrer" className="text-user-bubble hover:text-blue-400 underline">
+                      <a href="https://www.nami.org/help" target="_blank" rel="noopener noreferrer" className="text-user-bubble hover:bg-gradient-to-r hover:from-[#14F195] hover:to-[#0EA5E9] hover:bg-clip-text hover:text-transparent underline transition-all">
                         NAMI
                       </a> - Free support groups and education programs
                     </li>
                     <li>
-                      <a href="https://www.7cups.com" target="_blank" rel="noopener noreferrer" className="text-user-bubble hover:text-blue-400 underline">
+                      <a href="https://www.7cups.com" target="_blank" rel="noopener noreferrer" className="text-user-bubble hover:bg-gradient-to-r hover:from-[#14F195] hover:to-[#0EA5E9] hover:bg-clip-text hover:text-transparent underline transition-all">
                         7 Cups
                       </a> - Free emotional support from trained listeners
                     </li>
@@ -433,22 +418,22 @@ export default function AboutPage() {
                   <p className="text-white font-medium mb-2">Specific Support</p>
                   <ul className="space-y-2 text-gray-400">
                     <li>
-                      <a href="https://www.thehotline.org" target="_blank" rel="noopener noreferrer" className="text-user-bubble hover:text-blue-400 underline">
+                      <a href="https://www.thehotline.org" target="_blank" rel="noopener noreferrer" className="text-user-bubble hover:bg-gradient-to-r hover:from-[#14F195] hover:to-[#0EA5E9] hover:bg-clip-text hover:text-transparent underline transition-all">
                         National Domestic Violence Hotline
                       </a> - Call 1-800-799-7233 or text START to 88788
                     </li>
                     <li>
-                      <a href="https://www.rainn.org" target="_blank" rel="noopener noreferrer" className="text-user-bubble hover:text-blue-400 underline">
+                      <a href="https://www.rainn.org" target="_blank" rel="noopener noreferrer" className="text-user-bubble hover:bg-gradient-to-r hover:from-[#14F195] hover:to-[#0EA5E9] hover:bg-clip-text hover:text-transparent underline transition-all">
                         RAINN
                       </a> - Sexual assault support, call 1-800-656-4673
                     </li>
                     <li>
-                      <a href="https://www.thetrevorproject.org" target="_blank" rel="noopener noreferrer" className="text-user-bubble hover:text-blue-400 underline">
+                      <a href="https://www.thetrevorproject.org" target="_blank" rel="noopener noreferrer" className="text-user-bubble hover:bg-gradient-to-r hover:from-[#14F195] hover:to-[#0EA5E9] hover:bg-clip-text hover:text-transparent underline transition-all">
                         The Trevor Project
                       </a> - LGBTQ+ youth support, call 1-866-488-7386
                     </li>
                     <li>
-                      <a href="https://www.veteranscrisisline.net" target="_blank" rel="noopener noreferrer" className="text-user-bubble hover:text-blue-400 underline">
+                      <a href="https://www.veteranscrisisline.net" target="_blank" rel="noopener noreferrer" className="text-user-bubble hover:bg-gradient-to-r hover:from-[#14F195] hover:to-[#0EA5E9] hover:bg-clip-text hover:text-transparent underline transition-all">
                         Veterans Crisis Line
                       </a> - Call 988 and press 1, or text 838255
                     </li>
@@ -459,7 +444,12 @@ export default function AboutPage() {
 
             {/* When to Seek Help */}
             <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4">
-              <h4 className="font-semibold text-yellow-200 mb-3">⚠️ When to Seek Professional Help</h4>
+              <h4 className="font-semibold text-yellow-200 mb-3 flex items-center gap-2">
+                <svg className="w-5 h-5 text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                When to Seek Professional Help
+              </h4>
               <p className="text-sm text-gray-300 mb-3">Consider reaching out to a professional if you're experiencing:</p>
               <ul className="space-y-1 text-sm text-gray-400 list-disc list-inside">
                 <li>Persistent feelings of sadness, hopelessness, or emptiness lasting more than 2 weeks</li>
@@ -487,7 +477,7 @@ export default function AboutPage() {
           </p>
           <button
             onClick={() => router.push('/login')}
-            className="px-8 py-3 bg-user-bubble hover:bg-user-bubble/80 rounded-lg font-semibold transition-colors"
+            className="px-8 py-3 bg-gradient-to-r from-[#14F195] to-[#0EA5E9] hover:from-[#0EA5E9] hover:to-[#14F195] rounded-lg font-semibold transition-all text-gray-900"
           >
             Sign In / Sign Up
           </button>
@@ -496,7 +486,13 @@ export default function AboutPage() {
         {/* Footer */}
         <section className="text-center text-xs text-gray-500 pt-8 border-t border-gray-800">
           <p>Version 1.0.0 • December 2025</p>
-          <p className="mt-2">Made with ❤️ for people who want to grow</p>
+          <p className="mt-2 flex items-center justify-center gap-1.5">
+            Made with 
+            <svg className="w-3 h-3 text-red-400" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+            </svg>
+            for people who want to grow
+          </p>
         </section>
       </div>
     </div>
