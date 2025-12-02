@@ -130,21 +130,9 @@ function ChatPageContent() {
           // Active conversation ID exists but conversation was deleted/cleared
           clearActiveConversation(user.username, preferredPersonality)
           
-          // Create new conversation
+          // Show welcome message but don't create conversation yet
           const lastVisit = getLastVisit()
           const welcomeMsg = getWelcomeMessage(lastVisit, preferredPersonality)
-          
-          const initialMessage: SavedMessage = {
-            id: '1',
-            sender: 'ai',
-            content: welcomeMsg,
-            timestamp: new Date().toISOString()
-          }
-          
-          const newConvo = createConversation(user.username, preferredPersonality, initialMessage)
-          saveConversation(newConvo)
-          setCurrentConversationId(newConvo.metadata.id)
-          setActiveConversation(user.username, preferredPersonality, newConvo.metadata.id)
           
           setMessages([{
             id: '1',
@@ -154,21 +142,9 @@ function ChatPageContent() {
           }])
         }
       } else {
-        // Start new conversation
+        // Show welcome message but don't create conversation yet
         const lastVisit = getLastVisit()
         const welcomeMsg = getWelcomeMessage(lastVisit, preferredPersonality)
-        
-        const initialMessage: SavedMessage = {
-          id: '1',
-          sender: 'ai',
-          content: welcomeMsg,
-          timestamp: new Date().toISOString()
-        }
-        
-        const newConvo = createConversation(user.username, preferredPersonality, initialMessage)
-        saveConversation(newConvo)
-        setCurrentConversationId(newConvo.metadata.id)
-        setActiveConversation(user.username, preferredPersonality, newConvo.metadata.id)
         
         setMessages([{
           id: '1',
@@ -196,21 +172,9 @@ function ChatPageContent() {
     // Hide onboarding
     setShowOnboarding(false)
 
-    // Start new conversation
+    // Show welcome message but don't create conversation yet
     const lastVisit = getLastVisit()
     const welcomeMsg = getWelcomeMessage(lastVisit, personalityId)
-    
-    const initialMessage: SavedMessage = {
-      id: '1',
-      sender: 'ai',
-      content: welcomeMsg,
-      timestamp: new Date().toISOString()
-    }
-    
-    const newConvo = createConversation(currentUser.username, personalityId, initialMessage)
-    saveConversation(newConvo)
-    setCurrentConversationId(newConvo.metadata.id)
-    setActiveConversation(currentUser.username, personalityId, newConvo.metadata.id)
     
     setMessages([{
       id: '1',
@@ -616,14 +580,30 @@ function ChatPageContent() {
       const newMessages = [...prev, userMessage]
       
       // Save user message to conversation history
-      if (currentConversationId && currentUser) {
-        const savedMsg: SavedMessage = {
-          id: userMessage.id,
-          sender: userMessage.sender,
-          content: userMessage.content,
-          timestamp: userMessage.timestamp.toISOString()
+      if (currentUser) {
+        if (!currentConversationId) {
+          // Create new conversation with user's first message
+          const savedMsg: SavedMessage = {
+            id: userMessage.id,
+            sender: userMessage.sender,
+            content: userMessage.content,
+            timestamp: userMessage.timestamp.toISOString()
+          }
+          
+          const newConvo = createConversation(currentUser.username, selectedPersonality, savedMsg)
+          saveConversation(newConvo)
+          setCurrentConversationId(newConvo.metadata.id)
+          setActiveConversation(currentUser.username, selectedPersonality, newConvo.metadata.id)
+        } else {
+          // Add to existing conversation
+          const savedMsg: SavedMessage = {
+            id: userMessage.id,
+            sender: userMessage.sender,
+            content: userMessage.content,
+            timestamp: userMessage.timestamp.toISOString()
+          }
+          addMessagesToConversation(currentConversationId, [savedMsg])
         }
-        addMessagesToConversation(currentConversationId, [savedMsg])
       }
       
       // Clear any existing timeout
