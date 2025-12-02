@@ -21,11 +21,6 @@ const nextConfig = {
   // Optimize production builds
   swcMinify: true,
 
-  // Experimental features for better performance
-  experimental: {
-    optimizePackageImports: ['@/lib', '@/components'],
-  },
-
   // PWA configuration
   async headers() {
     return [
