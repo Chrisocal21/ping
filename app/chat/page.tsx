@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { handleAPIError, retryWithBackoff, fetchWithTimeout, logError } from '@/lib/error-handling'
 import { 
@@ -62,9 +62,8 @@ interface Message {
   scenario?: Scenario
 }
 
-export default function ChatPage() {
+function ChatPageContent() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [currentSession, setCurrentSession] = useState<Session | null>(null)
   const [conversationMode, setConversationMode] = useState<ConversationMode>('chat')
@@ -110,30 +109,8 @@ export default function ChatPage() {
       setResponseLength(storedLength as 'brief' | 'normal' | 'detailed')
     }
 
-    // Check if loading existing conversation from URL
-    const conversationIdParam = searchParams?.get('conversation')
-    
-    if (conversationIdParam) {
-      // Load existing conversation
-      const savedConvo = getConversation(conversationIdParam)
-      if (savedConvo) {
-        setCurrentConversationId(savedConvo.metadata.id)
-        setSelectedPersonality(savedConvo.metadata.personality)
-        
-        // Convert saved messages to Message format
-        const loadedMessages: Message[] = savedConvo.messages.map(msg => ({
-          id: msg.id,
-          sender: msg.sender,
-          content: msg.content,
-          timestamp: new Date(msg.timestamp)
-        }))
-        
-        setMessages(loadedMessages)
-        setActiveConversation(user.username, savedConvo.metadata.personality, savedConvo.metadata.id)
-      }
-    } else {
-      // Check for active conversation for this personality
-      const activeConvId = getActiveConversation(user.username, preferredPersonality)
+    // Check for active conversation for this personality
+    const activeConvId = getActiveConversation(user.username, preferredPersonality)
       
       if (activeConvId) {
         const savedConvo = getConversation(activeConvId)
@@ -200,12 +177,11 @@ export default function ChatPage() {
           timestamp: new Date(),
         }])
       }
-    }
 
     const session = createSession('chat')
     setCurrentSession(session)
     updateLastVisit()
-  }, [router, searchParams])
+  }, [router])
 
   const handleOnboardingComplete = (personalityId: string) => {
     if (!currentUser) return
@@ -1149,5 +1125,20 @@ export default function ChatPage() {
         </>
       )}
     </div>
+  )
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen bg-[#0F1419]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-user-bubble mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading...</p>
+        </div>
+      </div>
+    }>
+      <ChatPageContent />
+    </Suspense>
   )
 }

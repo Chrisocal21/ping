@@ -24,15 +24,9 @@ const nextConfig = {
   // Output configuration
   output: 'standalone',
   
-  // Disable build tracing for problematic patterns
+  // Disable output file tracing completely to avoid micromatch stack overflow
   experimental: {
-    outputFileTracingExcludes: {
-      '*': [
-        'node_modules/@swc/core-linux-x64-gnu',
-        'node_modules/@swc/core-linux-x64-musl',
-        'node_modules/@esbuild/linux-x64',
-      ],
-    },
+    outputFileTracingRoot: undefined,
   },
 
   // PWA configuration
