@@ -21,14 +21,6 @@ const nextConfig = {
   // Optimize production builds
   swcMinify: true,
 
-  // Output configuration
-  output: 'standalone',
-  
-  // Disable output file tracing completely to avoid micromatch stack overflow
-  experimental: {
-    outputFileTracingRoot: undefined,
-  },
-
   // PWA configuration
   async headers() {
     return [

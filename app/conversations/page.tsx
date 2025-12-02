@@ -11,6 +11,8 @@ export default function ConversationsPage() {
   const router = useRouter()
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [conversations, setConversations] = useState<ConversationMetadata[]>([])
+  const [longPressedId, setLongPressedId] = useState<string | null>(null)
+  const [pressTimer, setPressTimer] = useState<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     const user = getCurrentUser()
@@ -32,14 +34,32 @@ export default function ConversationsPage() {
     router.push(`/chat?conversation=${conversationId}`)
   }
 
-  const handleDeleteConversation = (conversationId: string, e: React.MouseEvent) => {
-    e.stopPropagation()
+  const handleDeleteConversation = (conversationId: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation()
+    }
     
     if (confirm('Delete this conversation? This cannot be undone.')) {
       deleteConversation(conversationId)
       if (currentUser) {
         loadConversations(currentUser.username)
       }
+      setLongPressedId(null)
+    }
+  }
+
+  const handlePressStart = (conversationId: string, e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault()
+    const timer = setTimeout(() => {
+      setLongPressedId(conversationId)
+    }, 500) // 500ms long press
+    setPressTimer(timer)
+  }
+
+  const handlePressEnd = () => {
+    if (pressTimer) {
+      clearTimeout(pressTimer)
+      setPressTimer(null)
     }
   }
 
@@ -153,12 +173,19 @@ export default function ConversationsPage() {
                     <div className="space-y-2">
                       {groupConvos.map(conv => {
                         const personality = getPersonality(conv.personality)
+                        const isLongPressed = longPressedId === conv.id
                         
                         return (
                           <div
                             key={conv.id}
-                            className="w-full bg-ai-bubble hover:bg-gray-800/80 rounded-lg p-4 transition-colors group cursor-pointer"
-                            onClick={() => handleOpenConversation(conv.id)}
+                            className="w-full bg-ai-bubble hover:bg-gray-800/80 rounded-lg p-4 transition-all group cursor-pointer relative"
+                            onClick={() => !isLongPressed && handleOpenConversation(conv.id)}
+                            onMouseDown={(e) => handlePressStart(conv.id, e)}
+                            onMouseUp={handlePressEnd}
+                            onMouseLeave={handlePressEnd}
+                            onTouchStart={(e) => handlePressStart(conv.id, e)}
+                            onTouchEnd={handlePressEnd}
+                            onTouchCancel={handlePressEnd}
                           >
                             <div className="flex items-start space-x-3">
                               <PersonalityAvatar personalityId={personality.id} size="lg" />
@@ -172,16 +199,32 @@ export default function ConversationsPage() {
                                   <span className="text-xs text-gray-500">{conv.messageCount} messages</span>
                                 </div>
                               </div>
+                              
+                              {/* Delete button - shows on hover (desktop) or long press (mobile) */}
                               <button
-                                onClick={(e) => handleDeleteConversation(conv.id, e)}
-                                className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-red-400 p-2"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleDeleteConversation(conv.id)
+                                }}
+                                className={`${
+                                  isLongPressed 
+                                    ? 'opacity-100' 
+                                    : 'opacity-0 group-hover:opacity-100'
+                                } transition-all text-gray-500 hover:text-red-400 p-2 ${
+                                  isLongPressed ? 'scale-110' : ''
+                                }`}
                                 title="Delete conversation"
                               >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                               </button>
                             </div>
+                            
+                            {/* Visual feedback for long press */}
+                            {isLongPressed && (
+                              <div className="absolute inset-0 rounded-lg border-2 border-red-400 pointer-events-none animate-pulse" />
+                            )}
                           </div>
                         )
                       })}

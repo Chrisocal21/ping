@@ -275,6 +275,17 @@ function ChatPageContent() {
           
           setMessages((prev) => [...prev, aiMessage])
           
+          // Save to conversation history
+          if (currentConversationId && currentUser) {
+            const savedMsg: SavedMessage = {
+              id: aiMessage.id,
+              sender: aiMessage.sender,
+              content: aiMessage.content,
+              timestamp: aiMessage.timestamp.toISOString()
+            }
+            addMessagesToConversation(currentConversationId, [savedMsg])
+          }
+          
           // Small delay before next bubble
           if (i < data.bubbles.length - 1) {
             await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 300))
@@ -575,36 +586,36 @@ function ChatPageContent() {
     const currentInput = inputValue
     setInputValue('')
     
-    // Update messages and capture the new state
+    // Save user message to conversation history BEFORE updating UI
+    if (currentUser) {
+      if (!currentConversationId) {
+        // Create new conversation with user's first message
+        const savedMsg: SavedMessage = {
+          id: userMessage.id,
+          sender: userMessage.sender,
+          content: userMessage.content,
+          timestamp: userMessage.timestamp.toISOString()
+        }
+        
+        const newConvo = createConversation(currentUser.username, selectedPersonality, savedMsg)
+        saveConversation(newConvo)
+        setCurrentConversationId(newConvo.metadata.id)
+        setActiveConversation(currentUser.username, selectedPersonality, newConvo.metadata.id)
+      } else {
+        // Add to existing conversation
+        const savedMsg: SavedMessage = {
+          id: userMessage.id,
+          sender: userMessage.sender,
+          content: userMessage.content,
+          timestamp: userMessage.timestamp.toISOString()
+        }
+        addMessagesToConversation(currentConversationId, [savedMsg])
+      }
+    }
+    
+    // Update messages UI
     setMessages((prev) => {
       const newMessages = [...prev, userMessage]
-      
-      // Save user message to conversation history
-      if (currentUser) {
-        if (!currentConversationId) {
-          // Create new conversation with user's first message
-          const savedMsg: SavedMessage = {
-            id: userMessage.id,
-            sender: userMessage.sender,
-            content: userMessage.content,
-            timestamp: userMessage.timestamp.toISOString()
-          }
-          
-          const newConvo = createConversation(currentUser.username, selectedPersonality, savedMsg)
-          saveConversation(newConvo)
-          setCurrentConversationId(newConvo.metadata.id)
-          setActiveConversation(currentUser.username, selectedPersonality, newConvo.metadata.id)
-        } else {
-          // Add to existing conversation
-          const savedMsg: SavedMessage = {
-            id: userMessage.id,
-            sender: userMessage.sender,
-            content: userMessage.content,
-            timestamp: userMessage.timestamp.toISOString()
-          }
-          addMessagesToConversation(currentConversationId, [savedMsg])
-        }
-      }
       
       // Clear any existing timeout
       if (sendTimeoutRef.current) {
@@ -766,19 +777,11 @@ function ChatPageContent() {
                         timestamp: new Date(),
                       }
                       
-                      // Start fresh - clear previous conversation and create new one
+                      // Start fresh - clear previous conversation state
+                      // Don't create conversation yet - wait for user's first message
                       if (currentUser) {
-                        const initialSavedMessage: SavedMessage = {
-                          id: switchMessage.id,
-                          sender: switchMessage.sender,
-                          content: switchMessage.content,
-                          timestamp: switchMessage.timestamp.toISOString()
-                        }
-                        
-                        const newConvo = createConversation(currentUser.username, personality.id, initialSavedMessage)
-                        saveConversation(newConvo) // Save immediately to localStorage
-                        setCurrentConversationId(newConvo.metadata.id)
-                        setActiveConversation(currentUser.username, personality.id, newConvo.metadata.id)
+                        clearActiveConversation(currentUser.username, selectedPersonality)
+                        setCurrentConversationId(null)
                       }
                       
                       setMessages([switchMessage])
