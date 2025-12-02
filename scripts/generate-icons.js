@@ -1,0 +1,40 @@
+const sharp = require('sharp');
+const fs = require('fs');
+const path = require('path');
+
+const svgIcon = `
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="115" fill="#0F1419"/>
+  <circle cx="256" cy="200" r="80" fill="#14F195"/>
+  <circle cx="180" cy="320" r="60" fill="#0EA5E9"/>
+  <circle cx="332" cy="320" r="60" fill="#14F195" opacity="0.7"/>
+  <path d="M 200 380 Q 256 420 312 380" stroke="#14F195" stroke-width="12" fill="none" stroke-linecap="round"/>
+</svg>
+`;
+
+const publicDir = path.join(__dirname, '..', 'public');
+
+async function generateIcons() {
+  try {
+    // Generate 192x192
+    await sharp(Buffer.from(svgIcon))
+      .resize(192, 192)
+      .png()
+      .toFile(path.join(publicDir, 'icon-192.png'));
+    console.log('✅ Generated icon-192.png');
+
+    // Generate 512x512
+    await sharp(Buffer.from(svgIcon))
+      .resize(512, 512)
+      .png()
+      .toFile(path.join(publicDir, 'icon-512.png'));
+    console.log('✅ Generated icon-512.png');
+
+    console.log('🎉 All icons generated successfully!');
+  } catch (error) {
+    console.error('❌ Error generating icons:', error);
+    process.exit(1);
+  }
+}
+
+generateIcons();

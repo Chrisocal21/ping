@@ -115,16 +115,27 @@ export function addUserFact(
   category: 'personal' | 'work' | 'relationship' | 'interest' | 'struggle' | 'goal'
 ): void {
   const memory = getUserMemory(userId)
-  memory.facts.push({
-    fact,
-    date: new Date().toISOString(),
-    category,
-  })
-  // Keep only last 50 facts to avoid bloat
-  if (memory.facts.length > 50) {
-    memory.facts = memory.facts.slice(-50)
+  
+  // Check for duplicate facts (avoid storing same thing twice)
+  const isDuplicate = memory.facts.some(f => 
+    f.fact.toLowerCase().includes(fact.toLowerCase().substring(0, 30)) ||
+    fact.toLowerCase().includes(f.fact.toLowerCase().substring(0, 30))
+  )
+  
+  if (!isDuplicate) {
+    memory.facts.push({
+      fact,
+      date: new Date().toISOString(),
+      category,
+    })
+    
+    // Keep last 100 facts (increased from 50) to retain more context
+    if (memory.facts.length > 100) {
+      memory.facts = memory.facts.slice(-100)
+    }
+    
+    saveUserMemory(memory)
   }
-  saveUserMemory(memory)
 }
 
 // Record scenario completion with tone choice
@@ -160,9 +171,9 @@ export function recordConversation(
   // Update streak
   updateStreak(userId)
   
-  // Keep only last 20 conversations
-  if (memory.pastConversations.length > 20) {
-    memory.pastConversations = memory.pastConversations.slice(-20)
+  // Keep last 30 conversations (increased from 20) for better context
+  if (memory.pastConversations.length > 30) {
+    memory.pastConversations = memory.pastConversations.slice(-30)
   }
   
   // Auto-detect recurring themes
@@ -179,21 +190,45 @@ export function getPersonalizedContext(userId: string): string {
   
   // Add user's name if known
   if (memory.preferences.name) {
-    context += `The user's name is ${memory.preferences.name}. `
+    context += `USER'S NAME: ${memory.preferences.name}\n`
   }
   
   // Add conversation style preference
   if (memory.preferences.conversationStyle) {
-    context += `They prefer ${memory.preferences.conversationStyle} conversation. `
+    context += `CONVERSATION STYLE: ${memory.preferences.conversationStyle}\n`
   }
   
-  // Add recent facts (last 10)
+  // Add recent facts (last 15, grouped by category)
   if (memory.facts.length > 0) {
-    const recentFacts = memory.facts.slice(-10)
-    context += `\n\nThings you know about them:\n`
+    const recentFacts = memory.facts.slice(-15)
+    
+    // Group by category
+    const grouped: Record<string, string[]> = {}
     recentFacts.forEach(f => {
-      context += `- ${f.fact}\n`
+      if (!grouped[f.category]) grouped[f.category] = []
+      grouped[f.category].push(f.fact)
     })
+    
+    context += `\n=== WHAT YOU KNOW ABOUT THIS USER ===\n`
+    
+    if (grouped.relationship) {
+      context += `\nRELATIONSHIPS:\n${grouped.relationship.map(f => `  • ${f}`).join('\n')}\n`
+    }
+    if (grouped.personal) {
+      context += `\nPERSONAL DETAILS:\n${grouped.personal.map(f => `  • ${f}`).join('\n')}\n`
+    }
+    if (grouped.work) {
+      context += `\nWORK/CAREER:\n${grouped.work.map(f => `  • ${f}`).join('\n')}\n`
+    }
+    if (grouped.struggle) {
+      context += `\nSTRUGGLES/CONCERNS:\n${grouped.struggle.map(f => `  • ${f}`).join('\n')}\n`
+    }
+    if (grouped.goal) {
+      context += `\nGOALS/ASPIRATIONS:\n${grouped.goal.map(f => `  • ${f}`).join('\n')}\n`
+    }
+    if (grouped.interest) {
+      context += `\nINTERESTS:\n${grouped.interest.map(f => `  • ${f}`).join('\n')}\n`
+    }
   }
   
   // Add tone preferences
@@ -201,21 +236,30 @@ export function getPersonalizedContext(userId: string): string {
   if (totalTones > 5) {
     const prefs = memory.patterns.tonePreferences
     const maxTone = Object.entries(prefs).reduce((a, b) => a[1] > b[1] ? a : b)[0]
-    context += `\nThey tend to choose ${maxTone} responses in practice scenarios. `
+    context += `\nPREFERRED TONE: ${maxTone} (they choose this ${Math.round((prefs[maxTone as keyof typeof prefs] / totalTones) * 100)}% of the time)\n`
   }
   
-  // Add recent conversation topics
+  // Add recent conversation topics (last 5)
   if (memory.pastConversations.length > 0) {
-    const recent = memory.pastConversations.slice(-3)
-    context += `\n\nRecent topics they've discussed:\n`
-    recent.forEach(c => {
-      context += `- ${c.topic}${c.emotion ? ` (feeling ${c.emotion})` : ''}\n`
+    const recent = memory.pastConversations.slice(-5)
+    context += `\n=== RECENT CONVERSATION HISTORY ===\n`
+    recent.forEach((c, i) => {
+      const date = new Date(c.date).toLocaleDateString()
+      context += `${i + 1}. [${date}] ${c.topic}${c.emotion ? ` (${c.emotion})` : ''} [${c.mode} mode]\n`
     })
   }
   
   // Add growth milestones
   if (memory.growth.scenariosCompleted > 0) {
-    context += `\nThey've completed ${memory.growth.scenariosCompleted} practice scenarios. `
+    context += `\nPRACTICE PROGRESS: ${memory.growth.scenariosCompleted} scenarios completed`
+    if (memory.growth.streakDays > 1) {
+      context += `, ${memory.growth.streakDays} day streak`
+    }
+    context += '\n'
+  }
+  
+  if (!context) {
+    return '' // No personal context yet
   }
   
   return context
@@ -241,9 +285,41 @@ export function extractFactsFromMessage(userId: string, message: string): void {
     }
   }
   
+  // Detect relationships (ENHANCED)
+  const relationshipPatterns = [
+    /my (boyfriend|girlfriend|partner|wife|husband|fiance|fiancee)/i,
+    /my (mom|dad|mother|father|parent|parents)/i,
+    /my (brother|sister|sibling)/i,
+    /my (best friend|friend)/i,
+    /my (boss|manager|coworker|colleague)/i,
+    /dating (someone|a guy|a girl)/i,
+    /in a relationship/i,
+  ]
+  for (const pattern of relationshipPatterns) {
+    const match = message.match(pattern)
+    if (match) {
+      addUserFact(userId, `Has ${match[1]} - mentioned in: "${message.substring(0, 100)}"`, 'relationship')
+      break
+    }
+  }
+  
+  // Detect upcoming events (NEW)
+  const eventPatterns = [
+    /meeting (his|her|their|my) (parents|mom|dad|family)/i,
+    /going to (meet|see)/i,
+    /(tomorrow|tonight|this weekend|next week|next month)/i,
+    /(interview|presentation|date|appointment|party|wedding)/i,
+  ]
+  for (const pattern of eventPatterns) {
+    if (pattern.test(message)) {
+      addUserFact(userId, `Upcoming event: "${message.substring(0, 100)}"`, 'personal')
+      break
+    }
+  }
+  
   // Detect job/work mentions
   if (lowerMessage.includes('work') || lowerMessage.includes('job')) {
-    const workKeywords = ['manager', 'developer', 'teacher', 'nurse', 'engineer', 'designer', 'student']
+    const workKeywords = ['manager', 'developer', 'teacher', 'nurse', 'engineer', 'designer', 'student', 'intern', 'freelance']
     for (const keyword of workKeywords) {
       if (lowerMessage.includes(keyword)) {
         addUserFact(userId, `Works as or studying to be a ${keyword}`, 'work')
@@ -253,17 +329,16 @@ export function extractFactsFromMessage(userId: string, message: string): void {
   }
   
   // Detect interests
-  const interestKeywords = ['love', 'enjoy', 'interested in', 'hobby', 'fan of']
+  const interestKeywords = ['love', 'enjoy', 'interested in', 'hobby', 'fan of', 'really like']
   for (const keyword of interestKeywords) {
     if (lowerMessage.includes(keyword)) {
-      // Extract the interest (simplified - in production would use NLP)
-      addUserFact(userId, `Mentioned interest: "${message.substring(0, 100)}"`, 'interest')
+      addUserFact(userId, `Interest: "${message.substring(0, 100)}"`, 'interest')
       break
     }
   }
   
   // Detect struggles/challenges
-  const struggleKeywords = ['struggling with', 'hard time', 'difficult', 'anxious about', 'worried about', 'stressed about']
+  const struggleKeywords = ['struggling with', 'hard time', 'difficult', 'anxious about', 'worried about', 'stressed about', 'nervous about', 'scared of']
   for (const keyword of struggleKeywords) {
     if (lowerMessage.includes(keyword)) {
       addUserFact(userId, `Struggle: "${message.substring(0, 100)}"`, 'struggle')
@@ -272,7 +347,7 @@ export function extractFactsFromMessage(userId: string, message: string): void {
   }
   
   // Detect goals
-  const goalKeywords = ['want to', 'trying to', 'goal is', 'working on', 'hope to']
+  const goalKeywords = ['want to', 'trying to', 'goal is', 'working on', 'hope to', 'planning to', 'need to']
   for (const keyword of goalKeywords) {
     if (lowerMessage.includes(keyword)) {
       addUserFact(userId, `Goal: "${message.substring(0, 100)}"`, 'goal')

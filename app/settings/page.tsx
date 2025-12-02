@@ -14,7 +14,9 @@ import {
   getUserMemory, 
   exportUserData, 
   importUserData, 
-  clearMemoryCategory 
+  clearMemoryCategory,
+  saveUserMemory,
+  type UserMemory
 } from '@/lib/memory'
 
 export default function SettingsPage() {
@@ -24,6 +26,13 @@ export default function SettingsPage() {
   const [responseLength, setResponseLength] = useState<'brief' | 'normal' | 'detailed'>('normal')
   const [showDataPreview, setShowDataPreview] = useState(false)
   const [dataStats, setDataStats] = useState<any>(null)
+  const [showMemoryBank, setShowMemoryBank] = useState(false)
+  const [userMemory, setUserMemory] = useState<UserMemory | null>(null)
+  const [editingFactId, setEditingFactId] = useState<number | null>(null)
+  const [editingFactText, setEditingFactText] = useState('')
+  const [showAddFact, setShowAddFact] = useState(false)
+  const [newFactText, setNewFactText] = useState('')
+  const [newFactCategory, setNewFactCategory] = useState<'personal' | 'work' | 'relationship' | 'interest' | 'struggle' | 'goal'>('personal')
 
   useEffect(() => {
     const user = getCurrentUser()
@@ -46,6 +55,7 @@ export default function SettingsPage() {
     // Load data stats
     const memory = getUserMemory(user.username)
     if (memory) {
+      setUserMemory(memory)
       setDataStats({
         factsCount: memory.facts.length,
         conversationsCount: memory.pastConversations.length,
@@ -56,6 +66,87 @@ export default function SettingsPage() {
       })
     }
   }, [router])
+
+  const handleDeleteFact = (index: number) => {
+    if (!currentUser || !userMemory) return
+    
+    if (confirm('Delete this memory?')) {
+      const updatedMemory = { ...userMemory }
+      updatedMemory.facts.splice(index, 1)
+      saveUserMemory(updatedMemory)
+      setUserMemory(updatedMemory)
+      
+      // Update stats
+      setDataStats({
+        ...dataStats,
+        factsCount: updatedMemory.facts.length
+      })
+    }
+  }
+
+  const handleEditFact = (index: number) => {
+    if (!userMemory) return
+    setEditingFactId(index)
+    setEditingFactText(userMemory.facts[index].fact)
+  }
+
+  const handleSaveFact = (index: number) => {
+    if (!currentUser || !userMemory) return
+    
+    const updatedMemory = { ...userMemory }
+    updatedMemory.facts[index].fact = editingFactText
+    updatedMemory.facts[index].date = new Date().toISOString()
+    saveUserMemory(updatedMemory)
+    setUserMemory(updatedMemory)
+    setEditingFactId(null)
+    setEditingFactText('')
+  }
+
+  const handleCancelEdit = () => {
+    setEditingFactId(null)
+    setEditingFactText('')
+  }
+
+  const handleDeleteConversation = (index: number) => {
+    if (!currentUser || !userMemory) return
+    
+    if (confirm('Delete this conversation record?')) {
+      const updatedMemory = { ...userMemory }
+      updatedMemory.pastConversations.splice(index, 1)
+      saveUserMemory(updatedMemory)
+      setUserMemory(updatedMemory)
+      
+      // Update stats
+      setDataStats({
+        ...dataStats,
+        conversationsCount: updatedMemory.pastConversations.length
+      })
+    }
+  }
+
+  const handleAddFact = () => {
+    if (!currentUser || !userMemory || !newFactText.trim()) return
+    
+    const updatedMemory = { ...userMemory }
+    updatedMemory.facts.push({
+      fact: newFactText.trim(),
+      date: new Date().toISOString(),
+      category: newFactCategory
+    })
+    saveUserMemory(updatedMemory)
+    setUserMemory(updatedMemory)
+    
+    // Update stats
+    setDataStats({
+      ...dataStats,
+      factsCount: updatedMemory.facts.length
+    })
+    
+    // Reset form
+    setNewFactText('')
+    setNewFactCategory('personal')
+    setShowAddFact(false)
+  }
 
   const handlePersonalityChange = (personalityId: string) => {
     setSelectedPersonality(personalityId)
@@ -276,6 +367,199 @@ export default function SettingsPage() {
                   <p className="text-2xl font-bold bg-gradient-to-r from-[#14F195] to-[#0EA5E9] bg-clip-text text-transparent">{dataStats.totalDays}</p>
                   <p className="text-xs text-gray-400 mt-1">Total Days</p>
                 </div>
+              </div>
+              
+              <button
+                onClick={() => setShowMemoryBank(!showMemoryBank)}
+                className="w-full mt-4 px-4 py-3 bg-gradient-to-r from-[#14F195] to-[#0EA5E9] hover:from-[#0EA5E9] hover:to-[#14F195] rounded-lg text-sm font-medium transition-all flex items-center justify-between text-gray-900"
+              >
+                <span>{showMemoryBank ? 'Hide Memory Bank' : 'View & Edit Memory Bank'}</span>
+                <svg className={`w-5 h-5 transition-transform ${showMemoryBank ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            </div>
+          )}
+
+          {/* Memory Bank - Expanded View */}
+          {showMemoryBank && userMemory && (
+            <div className="bg-[#1a1a24] rounded-lg p-6 space-y-6">
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium">Memory Bank</h3>
+                <span className="text-xs text-gray-400">All memories stored locally on your device</span>
+              </div>
+
+              {/* Facts Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-medium text-gray-300">Facts About You ({userMemory.facts.length})</h4>
+                  <button
+                    onClick={() => setShowAddFact(!showAddFact)}
+                    className="text-xs px-3 py-1.5 bg-[#14F195] hover:bg-[#0EA5E9] text-gray-900 rounded transition-colors font-medium"
+                  >
+                    {showAddFact ? 'Cancel' : '+ Add Fact'}
+                  </button>
+                </div>
+                
+                {/* Add New Fact Form */}
+                {showAddFact && (
+                  <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 space-y-3">
+                    <div>
+                      <label className="text-xs text-gray-400 mb-1 block">Category</label>
+                      <select
+                        value={newFactCategory}
+                        onChange={(e) => setNewFactCategory(e.target.value as any)}
+                        className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#14F195]"
+                      >
+                        <option value="personal">Personal</option>
+                        <option value="relationship">Relationship</option>
+                        <option value="work">Work</option>
+                        <option value="interest">Interest</option>
+                        <option value="struggle">Struggle</option>
+                        <option value="goal">Goal</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 mb-1 block">Fact</label>
+                      <textarea
+                        value={newFactText}
+                        onChange={(e) => setNewFactText(e.target.value)}
+                        placeholder="e.g., I have a girlfriend, I work as a developer, I love playing guitar..."
+                        className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-[#14F195]"
+                        rows={2}
+                      />
+                    </div>
+                    <button
+                      onClick={handleAddFact}
+                      disabled={!newFactText.trim()}
+                      className="w-full px-4 py-2 bg-gradient-to-r from-[#14F195] to-[#0EA5E9] hover:from-[#0EA5E9] hover:to-[#14F195] rounded text-sm font-medium transition-all text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Add to Memory Bank
+                    </button>
+                  </div>
+                )}
+                
+                {userMemory.facts.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 text-sm">
+                    <p>No facts stored yet.</p>
+                    <p className="text-xs mt-2">Start chatting and the AI will learn about you!</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {userMemory.facts.map((fact, index) => (
+                      <div key={index} className="bg-gray-800/50 rounded-lg p-4 space-y-2">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1">
+                            {editingFactId === index ? (
+                              <textarea
+                                value={editingFactText}
+                                onChange={(e) => setEditingFactText(e.target.value)}
+                                className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-[#14F195]"
+                                rows={2}
+                                autoFocus
+                              />
+                            ) : (
+                              <>
+                                <p className="text-sm">{fact.fact}</p>
+                                <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
+                                  <span className="px-2 py-0.5 bg-gray-700 rounded">{fact.category}</span>
+                                  <span>{new Date(fact.date).toLocaleDateString()}</span>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                          
+                          <div className="flex items-center gap-2">
+                            {editingFactId === index ? (
+                              <>
+                                <button
+                                  onClick={() => handleSaveFact(index)}
+                                  className="p-1.5 bg-green-600 hover:bg-green-500 rounded transition-colors"
+                                  title="Save"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={handleCancelEdit}
+                                  className="p-1.5 bg-gray-600 hover:bg-gray-500 rounded transition-colors"
+                                  title="Cancel"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => handleEditFact(index)}
+                                  className="p-1.5 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+                                  title="Edit"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteFact(index)}
+                                  className="p-1.5 bg-red-900/50 hover:bg-red-900 rounded transition-colors"
+                                  title="Delete"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Conversations Section */}
+              <div className="space-y-4 pt-4 border-t border-gray-700">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-medium text-gray-300">Recent Conversations ({userMemory.pastConversations.length})</h4>
+                </div>
+                
+                {userMemory.pastConversations.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 text-sm">
+                    <p>No conversations recorded yet.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {userMemory.pastConversations.slice().reverse().map((conv, index) => (
+                      <div key={index} className="bg-gray-800/50 rounded-lg p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1">
+                            <p className="text-sm">{conv.topic}</p>
+                            <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
+                              <span className="px-2 py-0.5 bg-gray-700 rounded">{conv.mode}</span>
+                              {conv.emotion && <span className="px-2 py-0.5 bg-gray-700 rounded">{conv.emotion}</span>}
+                              {conv.outcome && <span className="px-2 py-0.5 bg-gray-700 rounded">{conv.outcome}</span>}
+                              <span>{new Date(conv.date).toLocaleDateString()} {new Date(conv.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            </div>
+                          </div>
+                          
+                          <button
+                            onClick={() => handleDeleteConversation(userMemory.pastConversations.length - 1 - index)}
+                            className="p-1.5 bg-red-900/50 hover:bg-red-900 rounded transition-colors flex-shrink-0"
+                            title="Delete"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

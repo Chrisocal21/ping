@@ -1,8 +1,20 @@
 /**
  * Fallback Response System
  * 
- * Handles unexpected, unclear, or edge-case inputs gracefully.
- * Provides appropriate responses when the AI needs clarification or encounters unusual messages.
+ * CRITICAL: This should RARELY trigger. Let the AI handle normal conversation.
+ * 
+ * ONLY catches:
+ * - Empty messages
+ * - Pure gibberish (keyboard smashing, random characters)
+ * - Excessive punctuation only (no words)
+ * - Prompt injection attempts (security)
+ * - Messages repeated 3+ times identically
+ * 
+ * DO NOT catch:
+ * - Short responses like "ok", "yeah", "not much" (normal conversation)
+ * - Questions about the AI (let AI answer naturally)
+ * - Commands (let AI respond naturally)
+ * - Anything that could be legitimate conversation
  */
 
 export type FallbackType = 
@@ -61,14 +73,14 @@ export function analyzeFallbackNeed(
     }
   }
 
-  // Check for repeated messages
-  if (recentMessages.length > 0) {
-    const lastTwo = recentMessages.slice(-2)
-    if (lastTwo.every(msg => msg.toLowerCase() === lower)) {
+  // Check for repeated messages (only if repeated 3+ times in a row)
+  if (recentMessages.length >= 3) {
+    const lastThree = recentMessages.slice(-3)
+    if (lastThree.every(msg => msg.toLowerCase() === lower) && trimmed.length < 20) {
       return {
         needsFallback: true,
         type: 'repeated',
-        reason: 'User repeating same message'
+        reason: 'User repeating same short message multiple times'
       }
     }
   }
@@ -120,84 +132,31 @@ export function analyzeFallbackNeed(
     }
   }
 
-  // Check for common one-word non-starters
-  const nonStarters = [
-    'ok', 'okay', 'k', 'kk', 'yeah', 'yep', 'nope', 'nah', 'idk', 
-    'dunno', 'maybe', 'meh', 'ugh', 'hmm', 'umm', 'uhh', 'huh',
-    'lol', 'lmao', 'haha', 'nice', 'cool', 'sure', 'fine', 'whatever'
-  ]
-  
-  if (wordCount === 1 && nonStarters.includes(lower)) {
-    return {
-      needsFallback: true,
-      type: 'tooShort',
-      reason: 'One-word non-starter response'
-    }
-  }
+  // REMOVED: One-word responses are VALID conversation
+  // The AI should handle "ok", "yeah", etc naturally in context
+  // Only catch truly meaningless single characters
 
-  // Check for common filler phrases that need clarification
-  const fillerPhrases = [
-    'nothing really', 'not much', 'same old', 'the usual',
-    'i dont know', 'no idea', 'not sure', 'whatever',
-    'i guess', 'sort of', 'kind of'
-  ]
-  
-  if (fillerPhrases.some(phrase => lower === phrase || lower === phrase.replace(/\s/g, ''))) {
-    return {
-      needsFallback: true,
-      type: 'unclear',
-      reason: 'Vague filler phrase'
-    }
-  }
+  // REMOVED: Filler phrases are VALID conversation
+  // "not much" or "i guess" are legitimate responses the AI should handle
 
-  // Check for testing/meta messages
-  const testingPatterns = [
-    'test', 'testing', 'hello world', 'is this working', 'can you hear me',
-    'are you there', 'are you real', 'are you alive', 'what are you',
-    'who made you', 'who created you', 'are you an ai', 'are you a bot',
-    'can you understand me', 'do you understand', 'ignore previous',
-    'system prompt', 'you are now', 'pretend you are'
+  // Only catch prompt injection attempts (security)
+  const promptInjection = [
+    'ignore previous', 'ignore all previous', 'system prompt', 
+    'you are now', 'pretend you are', 'forget everything',
+    'disregard', 'new instructions'
   ]
   
-  if (testingPatterns.some(pattern => lower.includes(pattern))) {
+  if (promptInjection.some(pattern => lower.includes(pattern))) {
     return {
       needsFallback: true,
       type: 'testing',
-      reason: 'User testing or asking meta questions'
+      reason: 'Prompt injection attempt detected'
     }
   }
 
-  // Check for meta/system questions
-  const metaPatterns = [
-    'how do you work', 'how were you made', 'what can you do',
-    'what are your capabilities', 'what model are you', 'what version',
-    'who owns you', 'can you access', 'do you remember', 'do you store',
-    'are you chatgpt', 'are you gpt', 'what language model', 'who trained you',
-    'what are your limitations', 'can you learn', 'do you have feelings'
-  ]
-  
-  if (metaPatterns.some(pattern => lower.includes(pattern))) {
-    return {
-      needsFallback: true,
-      type: 'meta',
-      reason: 'User asking about system capabilities'
-    }
-  }
-
-  // Check for commands/instructions that don't make sense
-  const commandPatterns = [
-    'show me', 'give me a list', 'calculate', 'translate',
-    'write code', 'generate', 'create a', 'make me',
-    'search for', 'look up', 'find information'
-  ]
-  
-  if (commandPatterns.some(pattern => lower.startsWith(pattern))) {
-    return {
-      needsFallback: true,
-      type: 'unclear',
-      reason: 'Command-style request that needs context'
-    }
-  }
+  // REMOVED: Testing patterns - let AI handle naturally
+  // REMOVED: Meta questions - let AI answer naturally  
+  // REMOVED: Command patterns - let AI respond naturally
 
   // Check for very long messages with no punctuation (might be spam)
   if (trimmed.length > 500 && !trimmed.match(/[.!?,;]/)) {

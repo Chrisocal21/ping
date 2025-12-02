@@ -14,7 +14,7 @@ import {
 } from '@/lib/session'
 import { getCurrentUser, logout } from '@/lib/auth'
 import { getRandomScenario, type Scenario, type ScenarioOption } from '@/lib/scenarios'
-import { recordScenarioCompletion, recordConversation } from '@/lib/memory'
+import { recordScenarioCompletion, recordConversation, getUserMemory } from '@/lib/memory'
 import { 
   getAllPersonalities, 
   getPersonality, 
@@ -32,6 +32,7 @@ import {
 } from '@/lib/scenario-intelligence'
 import {
   createConversation,
+  saveConversation,
   getConversation,
   addMessagesToConversation,
   getActiveConversation,
@@ -79,7 +80,6 @@ export default function ChatPage() {
   const [showConversationsSidebar, setShowConversationsSidebar] = useState(false)
   const [responseLength, setResponseLength] = useState<'brief' | 'normal' | 'detailed'>('normal')
   const [showOnboarding, setShowOnboarding] = useState(false)
-  const [followUpQuestions, setFollowUpQuestions] = useState<Array<{text: string, category: string}> | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const sendTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -149,6 +149,32 @@ export default function ChatPage() {
           }))
           
           setMessages(loadedMessages)
+        } else {
+          // Active conversation ID exists but conversation was deleted/cleared
+          clearActiveConversation(user.username, preferredPersonality)
+          
+          // Create new conversation
+          const lastVisit = getLastVisit()
+          const welcomeMsg = getWelcomeMessage(lastVisit, preferredPersonality)
+          
+          const initialMessage: SavedMessage = {
+            id: '1',
+            sender: 'ai',
+            content: welcomeMsg,
+            timestamp: new Date().toISOString()
+          }
+          
+          const newConvo = createConversation(user.username, preferredPersonality, initialMessage)
+          saveConversation(newConvo)
+          setCurrentConversationId(newConvo.metadata.id)
+          setActiveConversation(user.username, preferredPersonality, newConvo.metadata.id)
+          
+          setMessages([{
+            id: '1',
+            sender: 'ai',
+            content: welcomeMsg,
+            timestamp: new Date(),
+          }])
         }
       } else {
         // Start new conversation
@@ -163,6 +189,7 @@ export default function ChatPage() {
         }
         
         const newConvo = createConversation(user.username, preferredPersonality, initialMessage)
+        saveConversation(newConvo)
         setCurrentConversationId(newConvo.metadata.id)
         setActiveConversation(user.username, preferredPersonality, newConvo.metadata.id)
         
@@ -205,6 +232,7 @@ export default function ChatPage() {
     }
     
     const newConvo = createConversation(currentUser.username, personalityId, initialMessage)
+    saveConversation(newConvo)
     setCurrentConversationId(newConvo.metadata.id)
     setActiveConversation(currentUser.username, personalityId, newConvo.metadata.id)
     
@@ -243,22 +271,17 @@ export default function ChatPage() {
     setIsTyping(true)
     
     try {
-      // Combine pending messages if there are multiple
-      const combinedInput = messagesToProcess.length > 1 
-        ? messagesToProcess.join('\n\n')
-        : messagesToProcess[0]
+      // Build proper conversation history from ALL messages
+      // The allMessages array already includes the user messages we need to process
+      const conversationHistory = allMessages.map((msg) => ({
+        role: msg.sender === 'user' ? ('user' as const) : ('assistant' as const),
+        content: msg.content,
+      }))
       
-      // Include the combined messages in conversation history
-      const conversationHistory = [
-        ...allMessages.map((msg) => ({
-          role: msg.sender === 'user' ? 'user' : 'assistant',
-          content: msg.content,
-        })),
-        {
-          role: 'user',
-          content: combinedInput,
-        }
-      ]
+      console.log('📨 Sending conversation with', conversationHistory.length, 'messages:', {
+        lastUser: conversationHistory.filter(m => m.role === 'user').slice(-1)[0]?.content,
+        lastAI: conversationHistory.filter(m => m.role === 'assistant').slice(-1)[0]?.content
+      })
       
       // Use retry logic with exponential backoff for resilience
       const data = await retryWithBackoff(async () => {
@@ -288,13 +311,6 @@ export default function ChatPage() {
           chat: '💬 Chat mode'
         }
         console.log(`Intent detected: ${intentLabels[data.detectedIntent as keyof typeof intentLabels]} (${Math.round(data.intentConfidence * 100)}% confidence)`)
-      }
-      
-      // Store follow-up questions if provided
-      if (data.followUpQuestions && data.followUpQuestions.length > 0) {
-        setFollowUpQuestions(data.followUpQuestions)
-      } else {
-        setFollowUpQuestions(null)
       }
       
       // Handle multi-bubble responses for more natural conversation
@@ -728,7 +744,7 @@ export default function ChatPage() {
 
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
-        <div className="relative">
+        <div className="relative flex items-center space-x-3">
           <button
             onClick={() => setShowPersonalityDropdown(!showPersonalityDropdown)}
             className="flex items-center space-x-3 hover:bg-gray-800/50 rounded-lg px-2 py-1 -ml-2 transition-colors"
@@ -743,6 +759,27 @@ export default function ChatPage() {
               </div>
             </div>
           </button>
+
+          {/* Memory Indicator */}
+          {currentUser && (() => {
+            const memory = getUserMemory(currentUser.username)
+            const factsCount = memory.facts.length
+            const conversationsCount = memory.pastConversations.length
+            
+            if (factsCount > 0 || conversationsCount > 0) {
+              return (
+                <div className="flex items-center space-x-1 px-2 py-1 bg-[#14F195]/10 border border-[#14F195]/30 rounded-md" title={`${factsCount} facts, ${conversationsCount} conversations remembered`}>
+                  <svg className="w-4 h-4 text-[#14F195]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                  </svg>
+                  <span className="text-xs font-medium text-[#14F195]">
+                    {factsCount} {factsCount === 1 ? 'memory' : 'memories'}
+                  </span>
+                </div>
+              )
+            }
+            return null
+          })()}
 
           {/* Personality Dropdown */}
           {showPersonalityDropdown && (
@@ -783,6 +820,7 @@ export default function ChatPage() {
                         }
                         
                         const newConvo = createConversation(currentUser.username, personality.id, initialSavedMessage)
+                        saveConversation(newConvo) // Save immediately to localStorage
                         setCurrentConversationId(newConvo.metadata.id)
                         setActiveConversation(currentUser.username, personality.id, newConvo.metadata.id)
                       }
@@ -831,7 +869,7 @@ export default function ChatPage() {
             </svg>
           </button>
           <button
-            onClick={() => setShowConversationsSidebar(true)}
+            onClick={() => router.push('/conversations')}
             className="text-gray-400 hover:text-white transition-colors"
             title="Conversation History"
           >
@@ -898,82 +936,6 @@ export default function ChatPage() {
             )}
           </div>
         ))}
-
-        {/* Follow-Up Questions */}
-        {followUpQuestions && followUpQuestions.length > 0 && !isTyping && (
-          <div className="flex justify-start animate-fade-in">
-            <div className="max-w-[75%] space-y-2">
-              <p className="text-xs text-gray-500 px-1 mb-1">Tap to continue:</p>
-              {followUpQuestions.map((question, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    setInputValue(question.text)
-                    setFollowUpQuestions(null)
-                    // Auto-send after a brief delay so user sees it populate
-                    setTimeout(() => {
-                      const trimmed = question.text.trim()
-                      if (trimmed) {
-                        const userMessage: Message = {
-                          id: Date.now().toString(),
-                          sender: 'user',
-                          content: trimmed,
-                          timestamp: new Date(),
-                        }
-                        setMessages((prev) => {
-                          const updated = [...prev, userMessage]
-                          if (currentConversationId && currentUser) {
-                            const savedMsg: SavedMessage = {
-                              id: userMessage.id,
-                              sender: userMessage.sender,
-                              content: userMessage.content,
-                              timestamp: userMessage.timestamp.toISOString()
-                            }
-                            addMessagesToConversation(currentConversationId, [savedMsg])
-                          }
-                          return updated
-                        })
-                        setInputValue('')
-                        setPendingMessages([trimmed])
-                        setLastSendTime(Date.now())
-                        
-                        // Start processing
-                        setTimeout(() => {
-                          const currentMessages = messages
-                          processPendingMessages([trimmed], [...currentMessages, userMessage])
-                        }, 300)
-                      }
-                    }, 100)
-                  }}
-                  className="w-full text-left bg-gray-800/50 hover:bg-gray-700/50 text-gray-300 rounded-lg px-3 py-2.5 text-sm transition-colors border border-gray-700/50 hover:border-[#14F195]/50"
-                >
-                  {question.text}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Follow-Up Questions */}
-        {followUpQuestions && followUpQuestions.length > 0 && !isTyping && (
-          <div className="flex justify-start animate-fade-in">
-            <div className="max-w-[75%] space-y-2">
-              <p className="text-xs text-gray-500 px-1 mb-1">Tap to continue:</p>
-              {followUpQuestions.map((question, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    setInputValue(question.text)
-                    handleSend()
-                  }}
-                  className="w-full text-left bg-gray-800/50 hover:bg-gray-700/50 text-gray-300 rounded-lg px-3 py-2.5 text-sm transition-colors border border-gray-700/50 hover:border-[#14F195]/50"
-                >
-                  {question.text}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Typing Indicator */}
         {isTyping && (

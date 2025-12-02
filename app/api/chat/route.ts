@@ -9,7 +9,7 @@ import {
   getResourceOfferMessage
 } from '@/lib/safety'
 import { getModeSystemPrompt, type ConversationMode } from '@/lib/session'
-import { getPersonalizedContext, extractFactsFromMessage } from '@/lib/memory'
+import { getPersonalizedContext, extractFactsFromMessage, recordConversation } from '@/lib/memory'
 import { getPersonalityPrompt } from '@/lib/personalities'
 import { 
   detectEmotionalState, 
@@ -37,10 +37,6 @@ import {
   needsOptimization,
   getOptimizationStats
 } from '@/lib/context-optimization'
-import {
-  generateFollowUpQuestions,
-  shouldGenerateFollowUps
-} from '@/lib/follow-up-questions'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -117,6 +113,12 @@ export async function POST(req: NextRequest) {
     const fallbackAnalysis = analyzeFallbackNeed(lastUserMessage, recentUserMessages)
     
     if (fallbackAnalysis.needsFallback) {
+      console.log('⚠️ FALLBACK TRIGGERED:', {
+        type: fallbackAnalysis.type,
+        reason: fallbackAnalysis.reason,
+        message: lastUserMessage.substring(0, 50)
+      })
+      
       const fallbackReply = getFallbackResponse(fallbackAnalysis.type, personality)
       
       return NextResponse.json({
@@ -138,7 +140,7 @@ export async function POST(req: NextRequest) {
     let systemPrompt = baseSystemPrompt
     
     if (personalContext) {
-      systemPrompt += `\n\n--- PERSONAL CONTEXT ---\n${personalContext}\n\nUse this context naturally. Reference past conversations when relevant, but don't force it. Be consistent with what you know about them.`
+      systemPrompt += `\n\n--- PERSONAL CONTEXT ---\n${personalContext}\n\nIMPORTANT: Only reference information explicitly listed above. Do NOT assume or hallucinate details about past conversations that aren't documented here. If you don't have information about something, don't pretend you do. Use this context naturally when relevant, but never make up memories or claim the user told you things they didn't.`
     }
     
     if (emotionalContext) {
@@ -188,28 +190,33 @@ export async function POST(req: NextRequest) {
     const conversationMessages = optimizedMessages.filter(m => m.role !== 'system')
     
     // First, have the AI deeply analyze the user's message (Chain of Thought)
-    const thinkingPrompt = `CRITICAL: Read the user's message very carefully and analyze deeply before responding.
+    const thinkingPrompt = `CRITICAL INSTRUCTIONS - READ THE ENTIRE CONVERSATION ABOVE FIRST:
 
-Step 1 - EXACT WORDS: What did they literally say? Quote their specific words.
+You MUST read through the ENTIRE conversation thread above before responding. Look at what the user has been saying across multiple messages, not just the last one.
 
-Step 2 - UNDERLYING MEANING: What are they really expressing? Go beyond surface level.
-- What emotion is present? (without labeling it clinically)
-- What are they worried about specifically?
-- What details did they include that matter?
-- What are they NOT saying but implying?
+Step 1 - CONVERSATION FLOW: Review the last 3-5 exchanges
+- What have they been talking about?
+- What did I already ask them?
+- What did they answer?
+- Am I about to repeat myself?
 
-Step 3 - WHAT THEY NEED: Based on their exact message, what would be most helpful?
-- Do they need a question to explore more?
-- Do they need acknowledgment of something specific?
-- Do they need help with a particular aspect?
-- Are they looking for understanding or next steps?
+Step 2 - THEIR LATEST MESSAGE: What did they JUST say? Quote their exact words.
+- Is this answering my previous question?
+- Is this continuing the topic?
+- Is this changing the subject?
 
-Step 4 - PERSONAL RESPONSE: How do I respond to THEIR specific situation?
-- What specific detail from their message should I reference?
-- What question is most relevant to what THEY said?
-- How do I avoid generic responses and make this personal?
+Step 3 - AVOID REPETITION: Check what I said in my last 2 responses
+- Did I already ask this question?
+- Am I looping?
+- Do I need to move the conversation forward?
 
-Now think through these steps carefully.`
+Step 4 - MEANINGFUL RESPONSE: What's the RIGHT next thing to say?
+- Acknowledge what they JUST told me
+- Reference specific details they mentioned
+- Ask something NEW that builds on their answer
+- Keep the conversation flowing naturally
+
+NOW REVIEW THE CONVERSATION ABOVE AND THINK CAREFULLY.`
 
     const thinkingCompletion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -230,7 +237,21 @@ Now think through these steps carefully.`
         { role: 'system', content: optimizedSystemPrompt },
         ...conversationMessages,
         { role: 'assistant', content: thinking },
-        { role: 'system', content: `Based on your careful analysis above, respond to the user. Your response must directly address what they specifically said and reference specific details from their message. Keep it ${lengthConfig.instruction}. Just give your natural response - no explanations about your process.` }
+        { role: 'system', content: `Based on your analysis above, respond naturally to what the user JUST said. 
+
+DO NOT:
+- Repeat questions you already asked
+- Say the same thing twice
+- Ignore what they just told you
+- Give generic filler responses
+
+DO:
+- Respond directly to their latest message
+- Reference specific things they said
+- Move the conversation forward
+- Keep it ${lengthConfig.instruction}
+
+Just give your natural response - no meta-commentary.` }
       ],
       temperature: responseLength === 'brief' ? 0.65 : 0.7,
       max_tokens: lengthConfig.maxTokens,
@@ -292,19 +313,18 @@ Now think through these steps carefully.`
       bubbles = [paragraphs[0], paragraphs.slice(1).join('\n\n')]
     }
 
-    // Generate follow-up questions to help continue the conversation
-    let followUpQuestions = undefined
-    if (shouldGenerateFollowUps(false, messages.length, lastUserMessage)) {
-      followUpQuestions = generateFollowUpQuestions({
-        mode: mode as ConversationMode,
-        intent: intentAnalysis.primaryIntent,
-        personality,
-        lastUserMessage,
-        lastAssistantMessage: reply,
-        emotionalState: typeof emotionalState === 'string' ? emotionalState : 'unknown',
-        hasFramework: !!coachingFramework
-      })
-    }
+    // REMOVED: Follow-up question suggestions
+    // Let the AI naturally guide conversation through its responses
+    // Users don't need button prompts - they can type what they want
+
+    // Record conversation to memory for future context
+    recordConversation(
+      userId,
+      lastUserMessage.substring(0, 100), // Topic summary
+      mode as string,
+      typeof emotionalState === 'string' ? emotionalState : undefined,
+      intentAnalysis.primaryIntent // Outcome
+    )
 
     return NextResponse.json({ 
       reply: validatedResponse, 
@@ -318,8 +338,7 @@ Now think through these steps carefully.`
       detectedIntent: intentAnalysis.confidence > 0.6 ? intentAnalysis.primaryIntent : undefined,
       intentConfidence: intentAnalysis.confidence,
       contextOptimized,
-      optimizationDetails,
-      followUpQuestions
+      optimizationDetails
     })
   } catch (error: any) {
     // Comprehensive error logging

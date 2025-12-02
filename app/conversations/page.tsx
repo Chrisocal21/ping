@@ -155,10 +155,10 @@ export default function ConversationsPage() {
                         const personality = getPersonality(conv.personality)
                         
                         return (
-                          <button
+                          <div
                             key={conv.id}
+                            className="w-full bg-ai-bubble hover:bg-gray-800/80 rounded-lg p-4 transition-colors group cursor-pointer"
                             onClick={() => handleOpenConversation(conv.id)}
-                            className="w-full bg-ai-bubble hover:bg-gray-800/80 rounded-lg p-4 transition-colors text-left group"
                           >
                             <div className="flex items-start space-x-3">
                               <PersonalityAvatar personalityId={personality.id} size="lg" />
@@ -182,7 +182,7 @@ export default function ConversationsPage() {
                                 </svg>
                               </button>
                             </div>
-                          </button>
+                          </div>
                         )
                       })}
                     </div>
