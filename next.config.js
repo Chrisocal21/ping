@@ -21,6 +21,20 @@ const nextConfig = {
   // Optimize production builds
   swcMinify: true,
 
+  // Exclude problematic dependencies from build tracing
+  experimental: {
+    outputFileTracingExcludes: {
+      '*': [
+        'node_modules/@swc/core-linux-x64-gnu',
+        'node_modules/@swc/core-linux-x64-musl',
+        'node_modules/@esbuild',
+        'node_modules/webpack',
+        'node_modules/rollup',
+        'node_modules/terser',
+      ],
+    },
+  },
+
   // PWA configuration
   async headers() {
     return [
